@@ -4,6 +4,9 @@
 /.esphome/
 /secrets.yaml
 
+# Python bytecode
+__pycache__/
+
 # Logs and large files
 *.txt
 *.pdf
