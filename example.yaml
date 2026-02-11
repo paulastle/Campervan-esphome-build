@@ -3,6 +3,8 @@ esphome:
   friendly_name: Campervan32
   min_version: 2025.11.0
   name_add_mac_suffix: false
+  includes:
+    - includes/net_test.h
   on_boot:
     - priority: -100
       then:
@@ -56,6 +58,30 @@ globals:
     restore_value: no
     initial_value: '0'
   - id: charger_last_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: ping_running
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: ping_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: ping_ok_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: ping_total_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: ping_min_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: ping_max_ms
     type: uint32_t
     restore_value: no
     initial_value: '0'
@@ -178,6 +204,9 @@ font:
       - "\U000F0AB1"  # mdi-chip
       - "\U000F00ED"  # mdi-clock-outline
       - "\U000F00A1"  # mdi-bluetooth-connect
+      - "\U000F0317"  # mdi-lan (ping)
+      - "\U000F01E7"  # mdi-earth (DNS)
+      - "\U000F0156"  # mdi-close (stop)
   - file: "gfonts://Roboto"
     id: roboto24
     size: 24
@@ -284,6 +313,154 @@ lvgl:
                 bg_color: 0x555555
                 bg_opa: 100%
                 border_width: 0
+            - obj:
+                id: dot6
+                x: 108
+                y: 0
+                width: 10
+                height: 10
+                radius: 5
+                bg_color: 0x555555
+                bg_opa: 100%
+                border_width: 0
+      - obj:
+          id: ping_popup
+          align: CENTER
+          width: 412
+          height: 412
+          bg_color: 0x000000
+          bg_opa: 90%
+          border_width: 0
+          radius: 206
+          pad_all: 0
+          opa: LV_OPA_COVER
+          hidden: true
+          widgets:
+            - label:
+                align: TOP_MID
+                y: 80
+                text: "Pinging Gateway"
+                text_font: roboto24
+                text_color: 0xFFFFFF
+            - label:
+                id: ping_latest_label
+                align: CENTER
+                y: -40
+                text: "..."
+                text_font: roboto48
+                text_color: 0x888888
+            - label:
+                id: ping_stats_label
+                align: CENTER
+                y: 20
+                text: ""
+                text_font: roboto24
+                text_color: 0x00CC66
+            - label:
+                id: ping_minmax_label
+                align: CENTER
+                y: 55
+                text: ""
+                text_font: roboto24
+                text_color: 0x888888
+            - button:
+                align: CENTER
+                y: 120
+                width: 80
+                height: 80
+                radius: 40
+                bg_color: 0xCC2222
+                border_width: 0
+                pad_all: 0
+                on_click:
+                  - lambda: |-
+                      id(ping_running) = false;
+                      id(settings_visible) = false;
+                      lv_obj_add_flag(id(ping_popup), LV_OBJ_FLAG_HIDDEN);
+                      // Update main page label with final summary
+                      int cnt = id(ping_count);
+                      int ok = id(ping_ok_count);
+                      if (cnt > 0 && ok > 0) {
+                        uint32_t avg = id(ping_total_ms) / ok;
+                        char buf[48];
+                        snprintf(buf, sizeof(buf), "%d/%d · %lums", ok, cnt, (unsigned long)avg);
+                        lv_label_set_text(id(ping_result_label), buf);
+                        lv_obj_set_style_text_color(id(ping_result_label), lv_color_hex(0x00CC66), 0);
+                      } else if (cnt > 0) {
+                        char buf[32];
+                        snprintf(buf, sizeof(buf), "0/%d OK", cnt);
+                        lv_label_set_text(id(ping_result_label), buf);
+                        lv_obj_set_style_text_color(id(ping_result_label), lv_color_hex(0xFF4444), 0);
+                      }
+                widgets:
+                  - label:
+                      align: CENTER
+                      text: "\U000F0156"
+                      text_font: mdi48
+                      text_color: 0xFFFFFF
+            - label:
+                align: CENTER
+                y: 175
+                text: "Stop"
+                text_font: roboto24
+                text_color: 0xCCCCCC
+      - obj:
+          id: dns_popup
+          align: CENTER
+          width: 412
+          height: 412
+          bg_color: 0x000000
+          bg_opa: 90%
+          border_width: 0
+          radius: 206
+          pad_all: 0
+          opa: LV_OPA_COVER
+          hidden: true
+          widgets:
+            - label:
+                align: TOP_MID
+                y: 80
+                text: "DNS Resolve\ngoogle.com"
+                text_font: roboto24
+                text_color: 0xFFFFFF
+            - label:
+                id: dns_ip_label
+                align: CENTER
+                y: -50
+                text: ""
+                text_font: roboto24
+                text_color: 0x00CC66
+            - label:
+                id: dns_latest_label
+                align: CENTER
+                y: 0
+                text: "..."
+                text_font: roboto48
+                text_color: 0x888888
+            - button:
+                align: CENTER
+                y: 120
+                width: 80
+                height: 80
+                radius: 40
+                bg_color: 0x444444
+                border_width: 0
+                pad_all: 0
+                on_click:
+                  - lambda: |-
+                      lv_obj_add_flag(id(dns_popup), LV_OBJ_FLAG_HIDDEN);
+                widgets:
+                  - label:
+                      align: CENTER
+                      text: "\U000F0156"
+                      text_font: mdi48
+                      text_color: 0xFFFFFF
+            - label:
+                align: CENTER
+                y: 175
+                text: "Done"
+                text_font: roboto24
+                text_color: 0xCCCCCC
   pages:
     # === Page 0: Splash ===
     - id: splash_page
@@ -298,6 +475,7 @@ lvgl:
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -342,6 +520,7 @@ lvgl:
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -395,6 +574,7 @@ lvgl:
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -448,6 +628,7 @@ lvgl:
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -471,7 +652,7 @@ lvgl:
             on_click:
               - lambda: |-
                   lv_indev_wait_release(lv_indev_get_act());
-                  id(lvgl_comp)->show_page(13, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+                  id(lvgl_comp)->show_page(14, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
             widgets:
               - label:
                   align: CENTER
@@ -499,6 +680,7 @@ lvgl:
             lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -570,6 +752,7 @@ lvgl:
             lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -641,6 +824,7 @@ lvgl:
             lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -703,19 +887,21 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -777,19 +963,21 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -851,19 +1039,21 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -956,25 +1146,27 @@ lvgl:
             text_font: roboto24
             text_color: 0xFFFFFF
 
-    # === Page 10: BLE Devices (System sub) ===
-    - id: ble_page
+    # === Page 10: Network Test (System sub) ===
+    - id: network_test_page
       bg_color: 0x000000
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -984,6 +1176,150 @@ lvgl:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
             id(lvgl_comp)->show_page(9, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 40
+            text: "Network Test"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Ping Gateway button
+        - button:
+            align: CENTER
+            x: -70
+            y: -10
+            width: 90
+            height: 90
+            radius: 45
+            bg_color: 0x222222
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  // Reset ping state
+                  id(ping_count) = 0;
+                  id(ping_ok_count) = 0;
+                  id(ping_total_ms) = 0;
+                  id(ping_min_ms) = UINT32_MAX;
+                  id(ping_max_ms) = 0;
+                  id(ping_running) = true;
+                  id(settings_visible) = true;
+                  // Clear popup labels
+                  lv_label_set_text(id(ping_latest_label), "...");
+                  lv_obj_set_style_text_color(id(ping_latest_label), lv_color_hex(0x888888), 0);
+                  lv_label_set_text(id(ping_stats_label), "");
+                  lv_label_set_text(id(ping_minmax_label), "");
+                  // Show popup
+                  lv_obj_clear_flag(id(ping_popup), LV_OBJ_FLAG_HIDDEN);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0317"
+                  text_font: mdi48
+                  text_color: 0x00AAFF
+        - label:
+            id: ping_result_label
+            align: CENTER
+            x: -70
+            y: 60
+            text: "Ping GW"
+            text_font: roboto24
+            text_color: 0x888888
+        # DNS Resolve button
+        - button:
+            align: CENTER
+            x: 70
+            y: -10
+            width: 90
+            height: 90
+            radius: 45
+            bg_color: 0x222222
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  // Show popup with "Resolving..." then do the lookup
+                  lv_label_set_text(id(dns_ip_label), "");
+                  lv_label_set_text(id(dns_latest_label), "...");
+                  lv_obj_set_style_text_color(id(dns_latest_label), lv_color_hex(0x888888), 0);
+                  lv_obj_clear_flag(id(dns_popup), LV_OBJ_FLAG_HIDDEN);
+                  lv_refr_now(NULL);
+                  // Resolve google.com
+                  uint32_t start = millis();
+                  struct addrinfo hints = {};
+                  hints.ai_family = AF_INET;
+                  struct addrinfo *res = nullptr;
+                  int err = lwip_getaddrinfo("google.com", nullptr, &hints, &res);
+                  uint32_t elapsed = millis() - start;
+                  if (err == 0 && res != nullptr) {
+                    auto *sa = (struct sockaddr_in *)res->ai_addr;
+                    uint32_t ip = sa->sin_addr.s_addr;
+                    char ip_str[16];
+                    snprintf(ip_str, sizeof(ip_str), "%d.%d.%d.%d",
+                      (int)(ip & 0xFF), (int)((ip >> 8) & 0xFF),
+                      (int)((ip >> 16) & 0xFF), (int)((ip >> 24) & 0xFF));
+                    lwip_freeaddrinfo(res);
+                    lv_label_set_text(id(dns_ip_label), ip_str);
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "%lu ms", (unsigned long)elapsed);
+                    lv_label_set_text(id(dns_latest_label), buf);
+                    lv_obj_set_style_text_color(id(dns_latest_label), lv_color_hex(0x00CC66), 0);
+                  } else {
+                    if (res) lwip_freeaddrinfo(res);
+                    lv_label_set_text(id(dns_ip_label), "");
+                    lv_label_set_text(id(dns_latest_label), "Failed");
+                    lv_obj_set_style_text_color(id(dns_latest_label), lv_color_hex(0xFF4444), 0);
+                  }
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F01E7"
+                  text_font: mdi48
+                  text_color: 0x00CC66
+        - label:
+            align: CENTER
+            x: 70
+            y: 60
+            text: "DNS Test"
+            text_font: roboto24
+            text_color: 0x888888
+
+    # === Page 11: BLE Devices (System sub) ===
+    - id: ble_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(12, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(10, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_up:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -1067,34 +1403,36 @@ lvgl:
             text_font: roboto24
             text_color: 0xFF4444
 
-    # === Page 11: Clock (System sub) ===
+    # === Page 12: Clock (System sub) ===
     - id: clock_page
       bg_color: 0x000000
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(12, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            id(lvgl_comp)->show_page(13, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(10, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(11, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_up:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -1124,32 +1462,34 @@ lvgl:
             text_font: roboto32
             text_color: 0x888888
 
-    # === Page 12: Sound Test (System sub) ===
+    # === Page 13: Sound Test (System sub) ===
     - id: sound_page
       bg_color: 0x000000
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0xFFFFFF), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(11, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(12, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_up:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -1254,7 +1594,7 @@ lvgl:
             text_font: roboto24
             text_color: 0x888888
 
-    # === Page 13: Settings ===
+    # === Page 14: Settings ===
     - id: settings_page
       bg_color: 0x000000
       on_load:
@@ -1533,6 +1873,75 @@ interval:
             snprintf(buf, sizeof(buf), "%lud %luh", (unsigned long)(uptime_s / 86400), (unsigned long)((uptime_s % 86400) / 3600));
           }
           lv_label_set_text(id(info_uptime_label), buf);
+
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (!id(ping_running)) return;
+          id(ping_count)++;
+          uint32_t start = millis();
+          int sock = lwip_socket(AF_INET, SOCK_STREAM, 0);
+          if (sock < 0) {
+            lv_label_set_text(id(ping_latest_label), "Sock err");
+            lv_obj_set_style_text_color(id(ping_latest_label), lv_color_hex(0xFF4444), 0);
+          } else {
+            struct timeval tv;
+            tv.tv_sec = 3;
+            tv.tv_usec = 0;
+            lwip_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+            struct sockaddr_in addr;
+            memset(&addr, 0, sizeof(addr));
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(53);
+            addr.sin_addr.s_addr = ipaddr_addr("192.168.0.1");
+            int ret = lwip_connect(sock, (struct sockaddr *)&addr, sizeof(addr));
+            uint32_t elapsed = millis() - start;
+            lwip_close(sock);
+            if (ret == 0) {
+              id(ping_ok_count)++;
+              id(ping_total_ms) += elapsed;
+              if (elapsed < id(ping_min_ms)) id(ping_min_ms) = elapsed;
+              if (elapsed > id(ping_max_ms)) id(ping_max_ms) = elapsed;
+              char buf[32];
+              snprintf(buf, sizeof(buf), "%lu ms", (unsigned long)elapsed);
+              lv_label_set_text(id(ping_latest_label), buf);
+              lv_obj_set_style_text_color(id(ping_latest_label), lv_color_hex(0x00CC66), 0);
+            } else {
+              lv_label_set_text(id(ping_latest_label), "Timeout");
+              lv_obj_set_style_text_color(id(ping_latest_label), lv_color_hex(0xFF4444), 0);
+            }
+          }
+          // Update stats labels
+          int cnt = id(ping_count);
+          int ok = id(ping_ok_count);
+          char stats[32];
+          snprintf(stats, sizeof(stats), "%d/%d OK", ok, cnt);
+          lv_label_set_text(id(ping_stats_label), stats);
+          if (ok == cnt) {
+            lv_obj_set_style_text_color(id(ping_stats_label), lv_color_hex(0x00CC66), 0);
+          } else {
+            lv_obj_set_style_text_color(id(ping_stats_label), lv_color_hex(0xFF4444), 0);
+          }
+          if (ok > 0) {
+            uint32_t avg = id(ping_total_ms) / ok;
+            char minmax[64];
+            snprintf(minmax, sizeof(minmax), "Min %lu · Avg %lu · Max %lu ms",
+              (unsigned long)id(ping_min_ms), (unsigned long)avg, (unsigned long)id(ping_max_ms));
+            lv_label_set_text(id(ping_minmax_label), minmax);
+          }
+          // Also update main page label
+          if (ok > 0) {
+            uint32_t avg = id(ping_total_ms) / ok;
+            char buf[48];
+            snprintf(buf, sizeof(buf), "%d/%d · %lums", ok, cnt, (unsigned long)avg);
+            lv_label_set_text(id(ping_result_label), buf);
+            lv_obj_set_style_text_color(id(ping_result_label), lv_color_hex(0x00CC66), 0);
+          } else {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "0/%d OK", cnt);
+            lv_label_set_text(id(ping_result_label), buf);
+            lv_obj_set_style_text_color(id(ping_result_label), lv_color_hex(0xFF4444), 0);
+          }
 
 text_sensor:
   - platform: template
