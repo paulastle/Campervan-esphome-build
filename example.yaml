@@ -9,18 +9,20 @@ esphome:
         - delay: 300ms
         - lambda: |-
             id(touch_glue).begin();
-            // Sync dropdown selections with restored global values
+            // Sync value labels with restored global values
+            const char* dim_labels[] = {"Never", "15 sec", "30 sec", "1 min", "2 min"};
             int dim_vals[] = {0, 15, 30, 60, 120};
             for (int i = 0; i < 5; i++) {
               if (dim_vals[i] == id(dim_timeout_sec)) {
-                lv_dropdown_set_selected(id(dim_dropdown).obj, i);
+                lv_label_set_text(id(dim_value_label),dim_labels[i]);
                 break;
               }
             }
+            const char* off_labels[] = {"Never", "30 sec", "1 min", "2 min", "5 min"};
             int off_vals[] = {0, 30, 60, 120, 300};
             for (int i = 0; i < 5; i++) {
               if (off_vals[i] == id(off_timeout_sec)) {
-                lv_dropdown_set_selected(id(off_dropdown).obj, i);
+                lv_label_set_text(id(off_value_label),off_labels[i]);
                 break;
               }
             }
@@ -60,8 +62,8 @@ spd2010_glue:
   height: 412
   int_gpio: 4
   swap_xy: false
-  mirror_x: true
-  mirror_y: true
+  mirror_x: false
+  mirror_y: false
 
 # Enable logging
 logger:
@@ -112,6 +114,16 @@ font:
   - file:
       type: web
       url: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
+    id: mdi64
+    size: 64
+    bpp: 4
+    glyphs:
+      - "\U000F0A72"  # mdi-solar-power (Power group)
+      - "\U000F092F"  # mdi-wifi (System group)
+      - "\U000F0493"  # mdi-cog (Settings)
+  - file:
+      type: web
+      url: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
     id: mdi48
     size: 48
     bpp: 4
@@ -122,7 +134,10 @@ font:
       - "\U000F0A72"  # mdi-solar-power
       - "\U000F0079"  # mdi-battery
       - "\U000F008E"  # mdi-battery-charging
+      - "\U000F192D"  # mdi-transmission-tower-import
       - "\U000F0493"  # mdi-cog
+      - "\U000F0141"  # mdi-chevron-left
+      - "\U000F0142"  # mdi-chevron-right
   - file: "gfonts://Roboto"
     id: roboto24
     size: 24
@@ -138,6 +153,7 @@ font:
       - "\U000F0156"  # mdi-close
       - "\U000F00E2"  # mdi-brightness-6
       - "\U000F0336"  # mdi-monitor-off
+      - "\U000F004D"  # mdi-arrow-left
   - file:
       type: web
       url: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
@@ -145,22 +161,26 @@ font:
     size: 144
     bpp: 4
     glyphs:
-      - "\U000F07FA"  # mdi-van-passenger
+      - "\U000F07FA"  # mdi-van-passenger (splash)
+      - "\U000F1C3B"  # mdi-power-plug-battery (Power hub)
+      - "\U000F0322"  # mdi-laptop (System hub)
+      - "\U000F0493"  # mdi-cog (Settings hub)
 
 lvgl:
   id: lvgl_comp
   displays:
     - main_display
   resume_on_input: false
-  page_wrap: true
+  page_wrap: false
   top_layer:
     widgets:
       - obj:
+          id: dots_container
           align: BOTTOM_MID
           y: -20
-          width: 100
+          width: 64
           height: 12
-          bg_opa: TRANSP
+          bg_opa: 0%
           border_width: 0
           pad_all: 0
           widgets:
@@ -170,464 +190,263 @@ lvgl:
                 y: 0
                 width: 10
                 height: 10
-                radius: 65535
+                radius: 5
                 bg_color: 0xFFFFFF
+                bg_opa: 100%
+                border_width: 0
             - obj:
                 id: dot1
                 x: 18
                 y: 0
                 width: 10
                 height: 10
-                radius: 65535
+                radius: 5
                 bg_color: 0x555555
+                bg_opa: 100%
+                border_width: 0
             - obj:
                 id: dot2
                 x: 36
                 y: 0
                 width: 10
                 height: 10
-                radius: 65535
+                radius: 5
                 bg_color: 0x555555
+                bg_opa: 100%
+                border_width: 0
             - obj:
                 id: dot3
                 x: 54
                 y: 0
                 width: 10
                 height: 10
-                radius: 65535
+                radius: 5
                 bg_color: 0x555555
-            - obj:
-                id: dot4
-                x: 72
-                y: 0
-                width: 10
-                height: 10
-                radius: 65535
-                bg_color: 0x555555
-            - obj:
-                id: dot5
-                x: 90
-                y: 0
-                width: 10
-                height: 10
-                radius: 65535
-                bg_color: 0x555555
-      - button:
-          id: settings_btn
-          align: TOP_MID
-          y: 25
-          width: 48
-          height: 48
-          radius: 24
-          bg_color: 0x222222
-          bg_opa: 70%
-          border_width: 0
-          pad_all: 0
-          on_click:
-            - globals.set:
-                id: settings_visible
-                value: 'true'
-            - lvgl.widget.show: settings_panel
-            - lvgl.widget.hide: settings_btn
-          widgets:
-            - label:
-                align: CENTER
-                text: "\U000F0493"
-                text_font: mdi32
-                text_color: 0xAAAAAA
-      - obj:
-          id: settings_panel
-          hidden: true
-          align: CENTER
-          width: 290
-          height: 290
-          radius: 145
-          bg_color: 0x1A1A1A
-          bg_opa: 94%
-          border_color: 0x333333
-          border_width: 1
-          pad_all: 0
-          widgets:
-            - label:
-                align: TOP_MID
-                y: 30
-                text: "Settings"
-                text_font: roboto24
-                text_color: 0xFFFFFF
-            - label:
-                align: CENTER
-                x: -95
-                y: -25
-                text: "\U000F00E2"
-                text_font: mdi32
-                text_color: 0xFFCC00
-            - label:
-                align: CENTER
-                x: -55
-                y: -25
-                text: "Dim"
-                text_font: roboto24
-                text_color: 0xCCCCCC
-            - dropdown:
-                id: dim_dropdown
-                align: CENTER
-                x: 35
-                y: -25
-                width: 130
-                height: 40
-                bg_color: 0x333333
-                border_color: 0x555555
-                border_width: 1
-                text_font: roboto24
-                text_color: 0xFFFFFF
-                options:
-                  - "Never"
-                  - "15 sec"
-                  - "30 sec"
-                  - "1 min"
-                  - "2 min"
-                selected_index: 2
-                on_value:
-                  - lambda: |-
-                      int vals[] = {0, 15, 30, 60, 120};
-                      int idx = lv_dropdown_get_selected(id(dim_dropdown).obj);
-                      if (idx >= 0 && idx < 5) id(dim_timeout_sec) = vals[idx];
-            - label:
-                align: CENTER
-                x: -95
-                y: 25
-                text: "\U000F0336"
-                text_font: mdi32
-                text_color: 0xFF6666
-            - label:
-                align: CENTER
-                x: -55
-                y: 25
-                text: "Off"
-                text_font: roboto24
-                text_color: 0xCCCCCC
-            - dropdown:
-                id: off_dropdown
-                align: CENTER
-                x: 35
-                y: 25
-                width: 130
-                height: 40
-                bg_color: 0x333333
-                border_color: 0x555555
-                border_width: 1
-                text_font: roboto24
-                text_color: 0xFFFFFF
-                options:
-                  - "Never"
-                  - "30 sec"
-                  - "1 min"
-                  - "2 min"
-                  - "5 min"
-                selected_index: 2
-                on_value:
-                  - lambda: |-
-                      int vals[] = {0, 30, 60, 120, 300};
-                      int idx = lv_dropdown_get_selected(id(off_dropdown).obj);
-                      if (idx >= 0 && idx < 5) id(off_timeout_sec) = vals[idx];
-            - button:
-                id: settings_close_btn
-                align: BOTTOM_MID
-                y: -25
-                width: 80
-                height: 40
-                radius: 20
-                bg_color: 0x333333
+                bg_opa: 100%
                 border_width: 0
-                pad_all: 0
-                on_click:
-                  - globals.set:
-                      id: settings_visible
-                      value: 'false'
-                  - lvgl.widget.hide: settings_panel
-                  - lvgl.widget.show: settings_btn
-                widgets:
-                  - label:
-                      align: CENTER
-                      text: "\U000F0156"
-                      text_font: mdi32
-                      text_color: 0xFFFFFF
   pages:
-    - id: hello_page
+    # === Page 0: Splash ===
+    - id: splash_page
       bg_color: 0x000000
       on_load:
-        - lvgl.widget.update:
-            id: dot0
-            bg_color: 0xFFFFFF
-        - lvgl.widget.update:
-            id: dot1
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot2
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot3
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot4
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot5
-            bg_color: 0x555555
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
       on_swipe_left:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.next:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.previous:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
         - label:
             align: CENTER
-            y: -50
+            y: -30
             text: "\U000F07FA"
             text_font: mdi144
             text_color: 0x00FF88
         - label:
             align: CENTER
-            y: 50
+            y: 100
             text: "CamperOS"
             text_font: roboto32
             text_color: 0xFFFFFF
         - label:
             align: CENTER
-            y: 85
-            text: "v8"
-            text_font: roboto32
-            text_color: 0x555555
-
-    - id: wifi_page
-      bg_color: 0x000000
-      on_load:
-        - lvgl.widget.update:
-            id: dot0
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot1
-            bg_color: 0xFFFFFF
-        - lvgl.widget.update:
-            id: dot2
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot3
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot4
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot5
-            bg_color: 0x555555
-      on_swipe_left:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.next:
-      on_swipe_right:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.previous:
-      widgets:
-        - arc:
-            id: wifi_arc
-            align: CENTER
-            y: -10
-            width: 260
-            height: 260
-            min_value: -90
-            max_value: -30
-            value: -90
-            start_angle: 135
-            end_angle: 45
-            adjustable: false
-            arc_width: 14
-            arc_color: 0x333333
-            arc_rounded: true
-            indicator:
-              arc_color: 0x00AAFF
-              arc_width: 14
-              arc_rounded: true
-        - label:
-            align: CENTER
-            y: -40
-            text: "\U000F092F"
-            text_font: mdi48
-            text_color: 0x00AAFF
-        - label:
-            id: wifi_value_label
-            align: CENTER
-            y: 15
-            text: "-- dBm"
-            text_font: roboto48
-            text_color: 0xFFFFFF
-        - label:
-            align: BOTTOM_MID
-            y: -50
-            text: "WiFi Signal"
-            text_font: roboto32
+            y: 140
+            text: "v9"
+            text_font: roboto24
             text_color: 0x666666
 
-    - id: temp_page
+    # === Page 1: Power Hub ===
+    - id: power_hub
       bg_color: 0x000000
       on_load:
-        - lvgl.widget.update:
-            id: dot0
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot1
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot2
-            bg_color: 0xFFFFFF
-        - lvgl.widget.update:
-            id: dot3
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot4
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot5
-            bg_color: 0x555555
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
       on_swipe_left:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.next:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.previous:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(0, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       widgets:
-        - arc:
-            id: temp_arc
+        - button:
             align: CENTER
-            y: -10
-            width: 260
-            height: 260
-            min_value: 0
-            max_value: 100
-            value: 0
-            start_angle: 135
-            end_angle: 45
-            adjustable: false
-            arc_width: 14
-            arc_color: 0x333333
-            arc_rounded: true
-            indicator:
-              arc_color: 0xFF6600
-              arc_width: 14
-              arc_rounded: true
-        - label:
-            align: CENTER
-            y: -40
-            text: "\U000F050F"
-            text_font: mdi48
-            text_color: 0xFF6600
-        - label:
-            id: temp_value_label
-            align: CENTER
-            y: 15
-            text: "-- °C"
-            text_font: roboto48
-            text_color: 0xFFFFFF
-        - label:
-            align: BOTTOM_MID
-            y: -50
-            text: "CPU Temp"
-            text_font: roboto32
-            text_color: 0x666666
+            width: 250
+            height: 250
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  lv_indev_wait_release(lv_indev_get_act());
+                  id(lvgl_comp)->show_page(4, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -30
+                  text: "\U000F1C3B"
+                  text_font: mdi144
+                  text_color: 0xFFCC00
+              - label:
+                  align: CENTER
+                  y: 100
+                  text: "Power"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
 
-    - id: solar_page
+    # === Page 2: System Hub ===
+    - id: system_hub
       bg_color: 0x000000
       on_load:
-        - lvgl.widget.update:
-            id: dot0
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot1
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot2
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot3
-            bg_color: 0xFFFFFF
-        - lvgl.widget.update:
-            id: dot4
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot5
-            bg_color: 0x555555
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
       on_swipe_left:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.next:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.previous:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       widgets:
-        - arc:
-            id: solar_arc
+        - button:
             align: CENTER
-            y: -10
-            width: 260
-            height: 260
-            min_value: 0
-            max_value: 500
-            value: 0
-            start_angle: 135
-            end_angle: 45
-            adjustable: false
-            arc_width: 14
-            arc_color: 0x333333
-            arc_rounded: true
-            indicator:
-              arc_color: 0xFFCC00
-              arc_width: 14
-              arc_rounded: true
-        - label:
-            align: CENTER
-            y: -40
-            text: "\U000F0A72"
-            text_font: mdi48
-            text_color: 0xFFCC00
-        - label:
-            id: solar_value_label
-            align: CENTER
-            y: 15
-            text: "-- W"
-            text_font: roboto48
-            text_color: 0xFFFFFF
-        - label:
-            align: BOTTOM_MID
-            y: -50
-            text: "Solar Power"
-            text_font: roboto32
-            text_color: 0x666666
+            width: 250
+            height: 250
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  lv_indev_wait_release(lv_indev_get_act());
+                  id(lvgl_comp)->show_page(7, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -30
+                  text: "\U000F0322"
+                  text_font: mdi144
+                  text_color: 0x00AAFF
+              - label:
+                  align: CENTER
+                  y: 100
+                  text: "System"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
 
+    # === Page 3: Settings Hub ===
+    - id: settings_hub
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      widgets:
+        - button:
+            align: CENTER
+            width: 250
+            height: 250
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  lv_indev_wait_release(lv_indev_get_act());
+                  id(lvgl_comp)->show_page(9, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -30
+                  text: "\U000F0493"
+                  text_font: mdi144
+                  text_color: 0xAAAAAA
+              - label:
+                  align: CENTER
+                  y: 100
+                  text: "Settings"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
+
+    # === Page 4: Battery (Power sub) ===
     - id: battery_page
       bg_color: 0x000000
       on_load:
-        - lvgl.widget.update:
-            id: dot0
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot1
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot2
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot3
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot4
-            bg_color: 0xFFFFFF
-        - lvgl.widget.update:
-            id: dot5
-            bg_color: 0x555555
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
       on_swipe_left:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.next:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(5, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.previous:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
         - arc:
             id: battery_arc
@@ -668,33 +487,102 @@ lvgl:
             text_font: roboto32
             text_color: 0x666666
 
+    # === Page 5: Solar (Power sub) ===
+    - id: solar_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(6, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(4, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: solar_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: 0
+            max_value: 500
+            value: 0
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0xFFCC00
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -40
+            text: "\U000F0A72"
+            text_font: mdi48
+            text_color: 0xFFCC00
+        - label:
+            id: solar_value_label
+            align: CENTER
+            y: 15
+            text: "-- W"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "Solar Power"
+            text_font: roboto32
+            text_color: 0x666666
+
+    # === Page 6: Charger (Power sub) ===
     - id: charger_page
       bg_color: 0x000000
       on_load:
-        - lvgl.widget.update:
-            id: dot0
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot1
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot2
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot3
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot4
-            bg_color: 0x555555
-        - lvgl.widget.update:
-            id: dot5
-            bg_color: 0xFFFFFF
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
       on_swipe_left:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.next:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       on_swipe_right:
-        - lambda: 'lv_indev_wait_release(lv_indev_get_act());'
-        - lvgl.page.previous:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(5, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
         - arc:
             id: charger_arc
@@ -718,7 +606,7 @@ lvgl:
         - label:
             align: CENTER
             y: -40
-            text: "\U000F008E"
+            text: "\U000F192D"
             text_font: mdi48
             text_color: 0x00CCCC
         - label:
@@ -734,6 +622,321 @@ lvgl:
             text: "Charger"
             text_font: roboto32
             text_color: 0x666666
+
+    # === Page 7: WiFi (System sub) ===
+    - id: wifi_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 28);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(8, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: wifi_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: -90
+            max_value: -30
+            value: -90
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0x00AAFF
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -40
+            text: "\U000F092F"
+            text_font: mdi48
+            text_color: 0x00AAFF
+        - label:
+            id: wifi_value_label
+            align: CENTER
+            y: 15
+            text: "-- dBm"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "WiFi Signal"
+            text_font: roboto32
+            text_color: 0x666666
+
+    # === Page 8: Temperature (System sub) ===
+    - id: temp_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 28);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(7, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: temp_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: 0
+            max_value: 100
+            value: 0
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0xFF6600
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -40
+            text: "\U000F050F"
+            text_font: mdi48
+            text_color: 0xFF6600
+        - label:
+            id: temp_value_label
+            align: CENTER
+            y: 15
+            text: "-- °C"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "CPU Temp"
+            text_font: roboto32
+            text_color: 0x666666
+
+    # === Page 9: Settings ===
+    - id: settings_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_add_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            id(settings_visible) = true;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: CENTER
+            y: -100
+            text: "Settings"
+            text_font: roboto32
+            text_color: 0xFFFFFF
+        # Screen Dim row
+        - label:
+            align: CENTER
+            x: -20
+            y: -40
+            text: "\U000F00E2"
+            text_font: mdi32
+            text_color: 0xFFCC00
+        - label:
+            align: CENTER
+            x: 30
+            y: -40
+            text: "Screen Dim"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        # Dim stepper: left arrow
+        - button:
+            align: CENTER
+            x: -90
+            y: 15
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 15, 30, 60, 120};
+                  const char* labels[] = {"Never", "15 sec", "30 sec", "1 min", "2 min"};
+                  int current = id(dim_timeout_sec);
+                  int idx = 0;
+                  for (int i = 0; i < 5; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx - 1 + 5) % 5;
+                  id(dim_timeout_sec) = vals[idx];
+                  lv_label_set_text(id(dim_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Dim stepper: value label
+        - label:
+            id: dim_value_label
+            align: CENTER
+            y: 15
+            text: "30 sec"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Dim stepper: right arrow
+        - button:
+            align: CENTER
+            x: 90
+            y: 15
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 15, 30, 60, 120};
+                  const char* labels[] = {"Never", "15 sec", "30 sec", "1 min", "2 min"};
+                  int current = id(dim_timeout_sec);
+                  int idx = 0;
+                  for (int i = 0; i < 5; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx + 1) % 5;
+                  id(dim_timeout_sec) = vals[idx];
+                  lv_label_set_text(id(dim_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Screen Off row
+        - label:
+            align: CENTER
+            x: -20
+            y: 70
+            text: "\U000F0336"
+            text_font: mdi32
+            text_color: 0xFF6666
+        - label:
+            align: CENTER
+            x: 30
+            y: 70
+            text: "Screen Off"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        # Off stepper: left arrow
+        - button:
+            align: CENTER
+            x: -90
+            y: 115
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 30, 60, 120, 300};
+                  const char* labels[] = {"Never", "30 sec", "1 min", "2 min", "5 min"};
+                  int current = id(off_timeout_sec);
+                  int idx = 0;
+                  for (int i = 0; i < 5; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx - 1 + 5) % 5;
+                  id(off_timeout_sec) = vals[idx];
+                  lv_label_set_text(id(off_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Off stepper: value label
+        - label:
+            id: off_value_label
+            align: CENTER
+            y: 115
+            text: "1 min"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Off stepper: right arrow
+        - button:
+            align: CENTER
+            x: 90
+            y: 115
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 30, 60, 120, 300};
+                  const char* labels[] = {"Never", "30 sec", "1 min", "2 min", "5 min"};
+                  int current = id(off_timeout_sec);
+                  int idx = 0;
+                  for (int i = 0; i < 5; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx + 1) % 5;
+                  id(off_timeout_sec) = vals[idx];
+                  lv_label_set_text(id(off_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
 
 interval:
   - interval: 500ms
@@ -757,7 +960,7 @@ interval:
             bool settings_open = id(settings_visible);
 
             if (settings_open) {
-              // Don't timeout while settings panel is open
+              // Don't timeout while settings page is open
               return;
             }
 
