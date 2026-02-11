@@ -47,6 +47,18 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
+  - id: mppt_last_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: shunt_last_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: charger_last_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
 
 i2c:
   frequency: 400kHz
@@ -102,7 +114,29 @@ victron_ble:
     mac_address: !secret victron_charger_mac
     bindkey: !secret victron_charger_bindkey
 
+rtttl:
+  speaker: i2s_audio_speaker
+  id: rtttl_player
+  gain: 0.6
+
+time:
+  - platform: sntp
+    id: sntp_time
+    on_time_sync:
+      - pcf85063.write_time:
+          id: pcf85063_time
+  - platform: pcf85063
+    id: pcf85063_time
+    address: 0x51
+
+debug:
+  update_interval: 30s
+
 font:
+  - file: "gfonts://Roboto"
+    id: roboto96
+    size: 96
+    bpp: 4
   - file: "gfonts://Roboto"
     id: roboto32
     size: 32
@@ -138,6 +172,12 @@ font:
       - "\U000F0493"  # mdi-cog
       - "\U000F0141"  # mdi-chevron-left
       - "\U000F0142"  # mdi-chevron-right
+      - "\U000F057E"  # mdi-volume-high
+      - "\U000F075F"  # mdi-music-note
+      - "\U000F0046"  # mdi-alarm
+      - "\U000F0AB1"  # mdi-chip
+      - "\U000F00ED"  # mdi-clock-outline
+      - "\U000F00A1"  # mdi-bluetooth-connect
   - file: "gfonts://Roboto"
     id: roboto24
     size: 24
@@ -224,6 +264,26 @@ lvgl:
                 bg_color: 0x555555
                 bg_opa: 100%
                 border_width: 0
+            - obj:
+                id: dot4
+                x: 72
+                y: 0
+                width: 10
+                height: 10
+                radius: 5
+                bg_color: 0x555555
+                bg_opa: 100%
+                border_width: 0
+            - obj:
+                id: dot5
+                x: 90
+                y: 0
+                width: 10
+                height: 10
+                radius: 5
+                bg_color: 0x555555
+                bg_opa: 100%
+                border_width: 0
   pages:
     # === Page 0: Splash ===
     - id: splash_page
@@ -236,6 +296,8 @@ lvgl:
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -278,6 +340,8 @@ lvgl:
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -329,6 +393,8 @@ lvgl:
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -380,6 +446,8 @@ lvgl:
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -403,7 +471,7 @@ lvgl:
             on_click:
               - lambda: |-
                   lv_indev_wait_release(lv_indev_get_act());
-                  id(lvgl_comp)->show_page(9, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+                  id(lvgl_comp)->show_page(13, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
             widgets:
               - label:
                   align: CENTER
@@ -429,6 +497,8 @@ lvgl:
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -498,6 +568,8 @@ lvgl:
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -567,6 +639,8 @@ lvgl:
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -629,13 +703,19 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 28);
+            lv_obj_set_width(id(dots_container), 100);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -697,16 +777,24 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 28);
+            lv_obj_set_width(id(dots_container), 100);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(9, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -757,7 +845,416 @@ lvgl:
             text_font: roboto32
             text_color: 0x666666
 
-    # === Page 9: Settings ===
+    # === Page 9: Device Info (System sub) ===
+    - id: device_info_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(10, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(8, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 40
+            text: "Device Info"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # IP Address
+        - label:
+            align: CENTER
+            x: -80
+            y: -55
+            text: "\U000F092F"
+            text_font: mdi48
+            text_color: 0x00AAFF
+        - label:
+            align: CENTER
+            x: 30
+            y: -70
+            text: "IP Address"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: info_ip_label
+            align: CENTER
+            x: 30
+            y: -45
+            text: "..."
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Uptime
+        - label:
+            align: CENTER
+            x: -80
+            y: 15
+            text: "\U000F00ED"
+            text_font: mdi48
+            text_color: 0x00CC66
+        - label:
+            align: CENTER
+            x: 30
+            y: 0
+            text: "Uptime"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: info_uptime_label
+            align: CENTER
+            x: 30
+            y: 25
+            text: "..."
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Free Heap
+        - label:
+            align: CENTER
+            x: -80
+            y: 85
+            text: "\U000F0AB1"
+            text_font: mdi48
+            text_color: 0xFFCC00
+        - label:
+            align: CENTER
+            x: 30
+            y: 70
+            text: "Free Heap"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: info_heap_label
+            align: CENTER
+            x: 30
+            y: 95
+            text: "..."
+            text_font: roboto24
+            text_color: 0xFFFFFF
+
+    # === Page 10: BLE Devices (System sub) ===
+    - id: ble_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(11, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(9, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 40
+            text: "BLE Devices"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Solar MPPT
+        - label:
+            align: CENTER
+            x: -80
+            y: -55
+            text: "\U000F0A72"
+            text_font: mdi48
+            text_color: 0xFFCC00
+        - label:
+            align: CENTER
+            x: 20
+            y: -70
+            text: "Solar MPPT"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: ble_mppt_label
+            align: CENTER
+            x: 20
+            y: -45
+            text: "Offline"
+            text_font: roboto24
+            text_color: 0xFF4444
+        # Battery Shunt
+        - label:
+            align: CENTER
+            x: -80
+            y: 15
+            text: "\U000F0079"
+            text_font: mdi48
+            text_color: 0x00CC66
+        - label:
+            align: CENTER
+            x: 20
+            y: 0
+            text: "Battery Shunt"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: ble_shunt_label
+            align: CENTER
+            x: 20
+            y: 25
+            text: "Offline"
+            text_font: roboto24
+            text_color: 0xFF4444
+        # Mains Charger
+        - label:
+            align: CENTER
+            x: -80
+            y: 85
+            text: "\U000F192D"
+            text_font: mdi48
+            text_color: 0x00CCCC
+        - label:
+            align: CENTER
+            x: 20
+            y: 70
+            text: "Mains Charger"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: ble_charger_label
+            align: CENTER
+            x: 20
+            y: 95
+            text: "Offline"
+            text_font: roboto24
+            text_color: 0xFF4444
+
+    # === Page 11: Clock (System sub) ===
+    - id: clock_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(12, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(10, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            id: clock_time_label
+            align: CENTER
+            y: -30
+            text: "--:--"
+            text_font: roboto96
+            text_color: 0xFFFFFF
+        - label:
+            id: clock_seconds_label
+            align: CENTER
+            y: 40
+            text: ":--"
+            text_font: roboto48
+            text_color: 0x888888
+        - label:
+            id: clock_date_label
+            align: CENTER
+            y: 100
+            text: "-- --- ----"
+            text_font: roboto32
+            text_color: 0x888888
+
+    # === Page 12: Sound Test (System sub) ===
+    - id: sound_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(11, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 40
+            text: "Sound Test"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Beep button
+        - button:
+            align: CENTER
+            x: -110
+            y: 0
+            width: 90
+            height: 90
+            radius: 45
+            bg_color: 0x222222
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - rtttl.stop:
+                  id: rtttl_player
+              - rtttl.play:
+                  id: rtttl_player
+                  rtttl: 'beep:d=16,o=6,b=140:c,p,c,p,c'
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F057E"
+                  text_font: mdi48
+                  text_color: 0x00AAFF
+        - label:
+            align: CENTER
+            x: -110
+            y: 60
+            text: "Beep"
+            text_font: roboto24
+            text_color: 0x888888
+        # Siren button
+        - button:
+            align: CENTER
+            x: 0
+            y: 0
+            width: 90
+            height: 90
+            radius: 45
+            bg_color: 0x222222
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - rtttl.stop:
+                  id: rtttl_player
+              - rtttl.play:
+                  id: rtttl_player
+                  rtttl: 'siren:d=8,o=5,b=100:d,e,d,e,d,e,d,e'
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0046"
+                  text_font: mdi48
+                  text_color: 0xFF6600
+        - label:
+            align: CENTER
+            x: 0
+            y: 60
+            text: "Siren"
+            text_font: roboto24
+            text_color: 0x888888
+        # Scale button
+        - button:
+            align: CENTER
+            x: 110
+            y: 0
+            width: 90
+            height: 90
+            radius: 45
+            bg_color: 0x222222
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - rtttl.stop:
+                  id: rtttl_player
+              - rtttl.play:
+                  id: rtttl_player
+                  rtttl: 'scale:d=4,o=5,b=120:c,d,e,f,g,a,b,c6'
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F075F"
+                  text_font: mdi48
+                  text_color: 0x00CC66
+        - label:
+            align: CENTER
+            x: 110
+            y: 60
+            text: "Scale"
+            text_font: roboto24
+            text_color: 0x888888
+
+    # === Page 13: Settings ===
     - id: settings_page
       bg_color: 0x000000
       on_load:
@@ -982,6 +1479,61 @@ interval:
           }
 
 # 1. The "Hello World" Text
+  - interval: 5s
+    then:
+      - lambda: |-
+          uint32_t now = millis();
+          auto update_ble = [](lv_obj_t *label, uint32_t last_ms, uint32_t now) {
+            if (last_ms == 0) {
+              lv_label_set_text(label, "No data");
+              lv_obj_set_style_text_color(label, lv_color_hex(0xFF4444), 0);
+              return;
+            }
+            uint32_t age_s = (now - last_ms) / 1000;
+            if (age_s < 120) {
+              char buf[32];
+              snprintf(buf, sizeof(buf), "Online (%lus)", (unsigned long)age_s);
+              lv_label_set_text(label, buf);
+              lv_obj_set_style_text_color(label, lv_color_hex(0x00CC66), 0);
+            } else {
+              char buf[32];
+              snprintf(buf, sizeof(buf), "Offline (%lus)", (unsigned long)age_s);
+              lv_label_set_text(label, buf);
+              lv_obj_set_style_text_color(label, lv_color_hex(0xFF4444), 0);
+            }
+          };
+          update_ble(id(ble_mppt_label), id(mppt_last_ms), now);
+          update_ble(id(ble_shunt_label), id(shunt_last_ms), now);
+          update_ble(id(ble_charger_label), id(charger_last_ms), now);
+
+  - interval: 1s
+    then:
+      - lambda: |-
+          auto time = id(sntp_time).now();
+          if (!time.is_valid()) return;
+          char buf[16];
+          snprintf(buf, sizeof(buf), "%02d:%02d", time.hour, time.minute);
+          lv_label_set_text(id(clock_time_label), buf);
+          snprintf(buf, sizeof(buf), ":%02d", time.second);
+          lv_label_set_text(id(clock_seconds_label), buf);
+          const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+          snprintf(buf, sizeof(buf), "%d %s %d", time.day_of_month, months[time.month - 1], time.year);
+          lv_label_set_text(id(clock_date_label), buf);
+
+  - interval: 30s
+    then:
+      - lambda: |-
+          uint32_t uptime_s = millis() / 1000;
+          char buf[32];
+          if (uptime_s < 3600) {
+            snprintf(buf, sizeof(buf), "%lum %lus", (unsigned long)(uptime_s / 60), (unsigned long)(uptime_s % 60));
+          } else if (uptime_s < 86400) {
+            snprintf(buf, sizeof(buf), "%luh %lum", (unsigned long)(uptime_s / 3600), (unsigned long)((uptime_s % 3600) / 60));
+          } else {
+            snprintf(buf, sizeof(buf), "%lud %luh", (unsigned long)(uptime_s / 86400), (unsigned long)((uptime_s % 86400) / 3600));
+          }
+          lv_label_set_text(id(info_uptime_label), buf);
+
 text_sensor:
   - platform: template
     name: "Van Dashboard Status"
@@ -989,9 +1541,31 @@ text_sensor:
     lambda: |-
       return {"Hello World - System Online"};
     update_interval: 60s
+  - platform: wifi_info
+    ip_address:
+      id: device_ip
+      on_value:
+        - lambda: |-
+            lv_label_set_text(id(info_ip_label), x.c_str());
+    ssid:
+      id: device_ssid
+  - platform: version
+    id: device_version
+    hide_timestamp: true
 
 sensor:
-  # ... (keep your existing Victron/JBD sensors here) ...
+  - platform: debug
+    free:
+      name: "Heap Free"
+      id: heap_free
+      on_value:
+        - lambda: |-
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%.0f KB", x / 1024.0);
+            lv_label_set_text(id(info_heap_label), buf);
+    psram:
+      name: "PSRAM Free"
+      id: psram_free
 
   # 2. Internal Temperature of the ESP32 Chip
   - platform: internal_temperature
@@ -1035,6 +1609,7 @@ sensor:
     name: "Solar Power"
     type: PV_POWER
     on_value:
+      - lambda: "id(mppt_last_ms) = millis();"
       - lvgl.label.update:
           id: solar_value_label
           text:
@@ -1050,6 +1625,7 @@ sensor:
     name: "Battery SOC"
     type: STATE_OF_CHARGE
     on_value:
+      - lambda: "id(shunt_last_ms) = millis();"
       - lvgl.label.update:
           id: battery_value_label
           text:
@@ -1065,6 +1641,7 @@ sensor:
     name: "Charger Voltage"
     type: BATTERY_VOLTAGE
     on_value:
+      - lambda: "id(charger_last_ms) = millis();"
       - lvgl.label.update:
           id: charger_value_label
           text:
