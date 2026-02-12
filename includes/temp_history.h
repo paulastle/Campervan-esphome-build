@@ -61,3 +61,9 @@ struct TempHistory {
 static TempHistory van_temp_hist;
 static TempHistory outside_temp_hist;
 static TempHistory fridge_temp_hist;
+static TempHistory solar_power_hist;
+static TempHistory shunt_voltage_hist;
+static TempHistory shunt_soc_hist;
+static TempHistory shunt_current_hist;
+static TempHistory mains_power_hist;
+static TempHistory mains_current_hist;

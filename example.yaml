@@ -15,6 +15,12 @@ esphome:
             van_temp_hist.init();
             outside_temp_hist.init();
             fridge_temp_hist.init();
+            solar_power_hist.init();
+            shunt_voltage_hist.init();
+            shunt_soc_hist.init();
+            shunt_current_hist.init();
+            mains_power_hist.init();
+            mains_current_hist.init();
             // Sync value labels with restored global values
             const char* dim_labels[] = {"Never", "15 sec", "30 sec", "1 min", "2 min"};
             int dim_vals[] = {0, 15, 30, 60, 120};
@@ -114,12 +120,14 @@ logger:
 
 # Enable Home Assistant API
 api:
+  reboot_timeout: 0s
 
 # Allow Over-The-Air updates
 ota:
 - platform: esphome
 
 wifi:
+  reboot_timeout: 0s
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   manual_ip:
@@ -217,6 +225,7 @@ font:
       - "\U000F058C"  # mdi-water-percent
       - "\U000F0531"  # mdi-tree
       - "\U000F0290"  # mdi-fridge
+      - "\U000F0183"  # mdi-lightning-bolt
   - file: "gfonts://Roboto"
     id: roboto28
     size: 28
@@ -248,6 +257,10 @@ font:
       - "\U000F1C3B"  # mdi-power-plug-battery (Power hub)
       - "\U000F0322"  # mdi-laptop (System hub)
       - "\U000F0493"  # mdi-cog (Settings hub)
+      - "\U000F0183"  # mdi-lightning-bolt (Energy hub)
+      - "\U000F0A72"  # mdi-solar-power (Solar hub)
+      - "\U000F0079"  # mdi-battery (Shunt hub)
+      - "\U000F0D3E"  # mdi-power-plug (Mains hub)
 
 lvgl:
   id: lvgl_comp
@@ -541,19 +554,20 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 82);
+            lv_obj_set_width(id(dots_container), 100);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
@@ -620,7 +634,7 @@ lvgl:
             on_click:
               - lambda: |-
                   lv_indev_wait_release(lv_indev_get_act());
-                  id(lvgl_comp)->show_page(4, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+                  id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
             widgets:
               - label:
                   align: CENTER
@@ -641,19 +655,20 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 82);
+            lv_obj_set_width(id(dots_container), 100);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -696,19 +711,20 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 82);
+            lv_obj_set_width(id(dots_container), 100);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -1843,30 +1859,29 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 82);
+            lv_obj_set_width(id(dots_container), 100);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       on_swipe_down:
-        - lambda: |-
-            lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(4, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 200);
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       on_swipe_up:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
@@ -1993,19 +2008,20 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 82);
+            lv_obj_set_width(id(dots_container), 100);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -2014,7 +2030,7 @@ lvgl:
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_down:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -2442,6 +2458,1048 @@ lvgl:
                   }
                   lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
 
+    # === Page 20: Victron Hub ===
+    - id: energy_hub_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - button:
+            align: CENTER
+            width: 300
+            height: 300
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  lv_indev_wait_release(lv_indev_get_act());
+                  id(lvgl_comp)->show_page(21, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 200);
+            widgets:
+              - label:
+                  id: energy_solar_summary
+                  align: CENTER
+                  y: -120
+                  text: "-- W"
+                  text_font: roboto24
+                  text_color: 0xFFCC00
+              - label:
+                  align: CENTER
+                  y: -30
+                  text: "\U000F1C3B"
+                  text_font: mdi144
+                  text_color: 0xFFCC00
+              - label:
+                  align: CENTER
+                  y: 100
+                  text: "Victron"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
+              - label:
+                  id: energy_battery_summary
+                  align: CENTER
+                  x: -70
+                  y: 130
+                  text: "-- %"
+                  text_font: roboto24
+                  text_color: 0x00CC66
+              - label:
+                  id: energy_mains_summary
+                  align: CENTER
+                  x: 70
+                  y: 130
+                  text: "-- W"
+                  text_font: roboto24
+                  text_color: 0x00CCCC
+
+    # === Page 21: Solar Hub ===
+    - id: solar_hub_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(22, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - button:
+            align: CENTER
+            width: 300
+            height: 300
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  lv_indev_wait_release(lv_indev_get_act());
+                  id(lvgl_comp)->show_page(24, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 200);
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -30
+                  text: "\U000F0A72"
+                  text_font: mdi144
+                  text_color: 0xFFCC00
+              - label:
+                  align: CENTER
+                  y: 100
+                  text: "Solar"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
+
+    # === Page 22: Shunt Hub ===
+    - id: shunt_hub_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(23, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(21, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - button:
+            align: CENTER
+            width: 300
+            height: 300
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  lv_indev_wait_release(lv_indev_get_act());
+                  id(lvgl_comp)->show_page(27, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 200);
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -30
+                  text: "\U000F0079"
+                  text_font: mdi144
+                  text_color: 0x00CC66
+              - label:
+                  align: CENTER
+                  y: 100
+                  text: "Battery"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
+
+    # === Page 23: Mains Hub ===
+    - id: mains_hub_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(22, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - button:
+            align: CENTER
+            width: 300
+            height: 300
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  lv_indev_wait_release(lv_indev_get_act());
+                  id(lvgl_comp)->show_page(30, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 200);
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -30
+                  text: "\U000F0D3E"
+                  text_font: mdi144
+                  text_color: 0x00CCCC
+              - label:
+                  align: CENTER
+                  y: 100
+                  text: "Mains"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
+
+    # === Page 24: Solar Live ===
+    - id: solar_live_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(25, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(21, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(21, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: solar_live_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: 0
+            max_value: 500
+            value: 0
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0xFFCC00
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -50
+            text: "\U000F0A72"
+            text_font: mdi48
+            text_color: 0xFFCC00
+        - label:
+            id: solar_live_power_label
+            align: CENTER
+            y: 5
+            text: "-- W"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            id: solar_live_current_label
+            align: CENTER
+            y: 55
+            text: "-- A"
+            text_font: roboto32
+            text_color: 0xCCCCCC
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "Solar"
+            text_font: roboto32
+            text_color: 0x666666
+        - button:
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            radius: 130
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - lambda: |-
+                  auto now = id(sntp_time).now().timestamp;
+                  float mn = solar_power_hist.get_min(now);
+                  float mx = solar_power_hist.get_max(now);
+                  char buf[32];
+                  lv_label_set_text(id(minmax_icon_label), "\U000F0A72");
+                  lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0xFFCC00), 0);
+                  lv_label_set_text(id(minmax_title_label), "24h Solar Power");
+                  if (std::isnan(mn)) {
+                    lv_label_set_text(id(minmax_min_label), "Min  -- W");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Min  %.0f W", mn);
+                    lv_label_set_text(id(minmax_min_label), buf);
+                  }
+                  if (std::isnan(mx)) {
+                    lv_label_set_text(id(minmax_max_label), "Max  -- W");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Max  %.0f W", mx);
+                    lv_label_set_text(id(minmax_max_label), buf);
+                  }
+                  lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
+
+    # === Page 25: Solar Today ===
+    - id: solar_today_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(26, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(24, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(21, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 60
+            text: "Today's Yield"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: solar_today_yield_label
+            align: CENTER
+            y: -30
+            text: "-- kWh"
+            text_font: roboto48
+            text_color: 0xFFCC00
+        - label:
+            id: solar_today_peak_label
+            align: CENTER
+            y: 30
+            text: "Peak  -- W"
+            text_font: roboto32
+            text_color: 0xCCCCCC
+        - label:
+            id: solar_today_state_label
+            align: CENTER
+            y: 80
+            text: "--"
+            text_font: roboto32
+            text_color: 0x888888
+
+    # === Page 26: Solar Status ===
+    - id: solar_status_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(25, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(21, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 50
+            text: "Solar MPPT"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: solar_status_state_label
+            align: CENTER
+            y: -60
+            text: "--"
+            text_font: roboto32
+            text_color: 0x888888
+        - label:
+            id: solar_status_error_label
+            align: CENTER
+            y: -25
+            text: ""
+            text_font: roboto24
+            text_color: 0xFF4444
+        - label:
+            id: solar_status_pv_label
+            align: CENTER
+            y: 15
+            text: "PV Power: -- W"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: solar_status_current_label
+            align: CENTER
+            y: 45
+            text: "Batt Current: -- A"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: solar_status_power_label
+            align: CENTER
+            y: 75
+            text: "Batt Power: -- W"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: solar_status_yield_label
+            align: CENTER
+            y: 105
+            text: "Yield Today: -- kWh"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+
+    # === Page 27: Battery Live ===
+    - id: battery_live_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(28, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(22, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(22, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: batt_live_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: 0
+            max_value: 100
+            value: 0
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0x00CC66
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -50
+            text: "\U000F0079"
+            text_font: mdi48
+            text_color: 0x00CC66
+        - label:
+            id: batt_live_soc_label
+            align: CENTER
+            y: 5
+            text: "-- %"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            id: batt_live_voltage_label
+            align: CENTER
+            y: 55
+            text: "-- V"
+            text_font: roboto32
+            text_color: 0xCCCCCC
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "Battery"
+            text_font: roboto32
+            text_color: 0x666666
+        - button:
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            radius: 130
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - lambda: |-
+                  auto now = id(sntp_time).now().timestamp;
+                  float mn = shunt_soc_hist.get_min(now);
+                  float mx = shunt_soc_hist.get_max(now);
+                  char buf[32];
+                  lv_label_set_text(id(minmax_icon_label), "\U000F0079");
+                  lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0x00CC66), 0);
+                  lv_label_set_text(id(minmax_title_label), "24h Battery SOC");
+                  if (std::isnan(mn)) {
+                    lv_label_set_text(id(minmax_min_label), "Min  -- %");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Min  %.0f %%", mn);
+                    lv_label_set_text(id(minmax_min_label), buf);
+                  }
+                  if (std::isnan(mx)) {
+                    lv_label_set_text(id(minmax_max_label), "Max  -- %");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Max  %.0f %%", mx);
+                    lv_label_set_text(id(minmax_max_label), buf);
+                  }
+                  lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
+
+    # === Page 28: Battery Detail ===
+    - id: battery_detail_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(29, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(27, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(22, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 50
+            text: "Battery"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: batt_detail_voltage_label
+            align: CENTER
+            y: -55
+            text: "-- V"
+            text_font: roboto48
+            text_color: 0x00CC66
+        - label:
+            id: batt_detail_current_label
+            align: CENTER
+            y: -5
+            text: "-- A"
+            text_font: roboto32
+            text_color: 0xCCCCCC
+        - label:
+            id: batt_detail_consumed_label
+            align: CENTER
+            y: 40
+            text: "Consumed: -- Ah"
+            text_font: roboto28
+            text_color: 0xCCCCCC
+        - label:
+            id: batt_detail_temp_label
+            align: CENTER
+            y: 75
+            text: "Temp: -- \u00B0C"
+            text_font: roboto28
+            text_color: 0xCCCCCC
+        - label:
+            id: batt_detail_ttg_label
+            align: CENTER
+            y: 110
+            text: "TTG: --"
+            text_font: roboto28
+            text_color: 0xCCCCCC
+
+    # === Page 29: Battery History ===
+    - id: battery_history_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(28, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(22, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 55
+            text: "24h Battery"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        # Voltage row
+        - label:
+            align: CENTER
+            x: -80
+            y: -35
+            text: "Voltage"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: batt_hist_voltage_label
+            align: CENTER
+            x: 40
+            y: -35
+            text: "-- \u2014 -- V"
+            text_font: roboto28
+            text_color: 0x00CC66
+        # SOC row
+        - label:
+            align: CENTER
+            x: -80
+            y: 15
+            text: "SOC"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: batt_hist_soc_label
+            align: CENTER
+            x: 40
+            y: 15
+            text: "-- \u2014 -- %"
+            text_font: roboto28
+            text_color: 0x00CC66
+        # Current row
+        - label:
+            align: CENTER
+            x: -80
+            y: 65
+            text: "Current"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: batt_hist_current_label
+            align: CENTER
+            x: 40
+            y: 65
+            text: "-- \u2014 -- A"
+            text_font: roboto28
+            text_color: 0xCCCCCC
+
+    # === Page 30: Mains Live ===
+    - id: mains_live_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(31, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(23, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(23, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: mains_live_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: 0
+            max_value: 500
+            value: 0
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0x00CCCC
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -50
+            text: "\U000F0D3E"
+            text_font: mdi48
+            text_color: 0x00CCCC
+        - label:
+            id: mains_live_power_label
+            align: CENTER
+            y: 5
+            text: "-- W"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            id: mains_live_current_label
+            align: CENTER
+            y: 55
+            text: "-- A"
+            text_font: roboto32
+            text_color: 0xCCCCCC
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "Mains"
+            text_font: roboto32
+            text_color: 0x666666
+        - button:
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            radius: 130
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - lambda: |-
+                  auto now = id(sntp_time).now().timestamp;
+                  float mn = mains_power_hist.get_min(now);
+                  float mx = mains_power_hist.get_max(now);
+                  char buf[32];
+                  lv_label_set_text(id(minmax_icon_label), "\U000F0D3E");
+                  lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0x00CCCC), 0);
+                  lv_label_set_text(id(minmax_title_label), "24h Mains Power");
+                  if (std::isnan(mn)) {
+                    lv_label_set_text(id(minmax_min_label), "Min  -- W");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Min  %.0f W", mn);
+                    lv_label_set_text(id(minmax_min_label), buf);
+                  }
+                  if (std::isnan(mx)) {
+                    lv_label_set_text(id(minmax_max_label), "Max  -- W");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Max  %.0f W", mx);
+                    lv_label_set_text(id(minmax_max_label), buf);
+                  }
+                  lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
+
+    # === Page 31: Mains Status ===
+    - id: mains_status_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(32, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(30, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(23, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 50
+            text: "Mains Charger"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: mains_status_state_label
+            align: CENTER
+            y: -55
+            text: "--"
+            text_font: roboto32
+            text_color: 0x888888
+        - label:
+            id: mains_status_error_label
+            align: CENTER
+            y: -20
+            text: ""
+            text_font: roboto24
+            text_color: 0xFF4444
+        - label:
+            id: mains_status_power_label
+            align: CENTER
+            y: 15
+            text: "Batt Power: -- W"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: mains_status_current_label
+            align: CENTER
+            y: 45
+            text: "Batt Current: -- A"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: mains_status_voltage_label
+            align: CENTER
+            y: 75
+            text: "Batt Voltage: -- V"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - label:
+            id: mains_status_ac_label
+            align: CENTER
+            y: 105
+            text: "AC Current: -- A"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+
+    # === Page 32: Mains History ===
+    - id: mains_history_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(31, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(23, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 55
+            text: "24h Mains"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        # Power row
+        - label:
+            align: CENTER
+            x: -80
+            y: -15
+            text: "Power"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: mains_hist_power_label
+            align: CENTER
+            x: 40
+            y: -15
+            text: "-- \u2014 -- W"
+            text_font: roboto28
+            text_color: 0x00CCCC
+        # Current row
+        - label:
+            align: CENTER
+            x: -80
+            y: 35
+            text: "Current"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: mains_hist_current_label
+            align: CENTER
+            x: 40
+            y: 35
+            text: "-- \u2014 -- A"
+            text_font: roboto28
+            text_color: 0x00CCCC
+
 interval:
   - interval: 50ms
     then:
@@ -2714,6 +3772,222 @@ interval:
             lv_label_set_text(id(fridge_humid_label), buf);
           }
 
+          // --- Energy Monitor pages ---
+          float mppt_bat_power = id(mppt_battery_power).state;
+          float yield_today = id(mppt_yield_today).state;
+          float consumed_ah = id(shunt_consumed_ah).state;
+          float shunt_temp = id(shunt_temperature).state;
+          float mains_v = id(mains_voltage).state;
+          float mains_ac = id(mains_ac_current).state;
+          auto mppt_state = id(mppt_device_state).state;
+          auto mppt_error = id(mppt_charger_error).state;
+          auto mains_state = id(mains_device_state).state;
+          auto mains_error = id(mains_charger_error).state;
+
+          // Energy Monitor Hub (20) summary labels
+          if (std::isnan(pv_power)) {
+            lv_label_set_text(id(energy_solar_summary), "-- W");
+          } else {
+            snprintf(buf, sizeof(buf), "%.0f W", pv_power);
+            lv_label_set_text(id(energy_solar_summary), buf);
+          }
+          if (std::isnan(soc)) {
+            lv_label_set_text(id(energy_battery_summary), "-- %");
+          } else {
+            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            lv_label_set_text(id(energy_battery_summary), buf);
+          }
+          if (std::isnan(mains_power)) {
+            lv_label_set_text(id(energy_mains_summary), "-- W");
+          } else {
+            snprintf(buf, sizeof(buf), "%.0f W", mains_power);
+            lv_label_set_text(id(energy_mains_summary), buf);
+          }
+
+          // Solar Live (24)
+          if (!std::isnan(pv_power)) {
+            lv_arc_set_value(id(solar_live_arc), (int)pv_power);
+            snprintf(buf, sizeof(buf), "%.0f W", pv_power);
+            lv_label_set_text(id(solar_live_power_label), buf);
+          }
+          if (!std::isnan(mppt_i)) {
+            snprintf(buf, sizeof(buf), "%.1f A", mppt_i);
+            lv_label_set_text(id(solar_live_current_label), buf);
+          }
+
+          // Solar Today (25)
+          if (!std::isnan(yield_today)) {
+            snprintf(buf, sizeof(buf), "%.2f kWh", yield_today);
+            lv_label_set_text(id(solar_today_yield_label), buf);
+          }
+          {
+            auto now_ts = id(sntp_time).now().timestamp;
+            float peak = solar_power_hist.get_max(now_ts);
+            if (!std::isnan(peak)) {
+              snprintf(buf, sizeof(buf), "Peak  %.0f W", peak);
+              lv_label_set_text(id(solar_today_peak_label), buf);
+            }
+          }
+          if (mppt_state.length() > 0) {
+            lv_label_set_text(id(solar_today_state_label), mppt_state.c_str());
+            bool active = (mppt_state != "Off");
+            lv_obj_set_style_text_color(id(solar_today_state_label),
+              lv_color_hex(active ? 0x00CC66 : 0x888888), 0);
+          }
+
+          // Solar Status (26)
+          if (mppt_state.length() > 0) {
+            lv_label_set_text(id(solar_status_state_label), mppt_state.c_str());
+            bool active = (mppt_state != "Off");
+            lv_obj_set_style_text_color(id(solar_status_state_label),
+              lv_color_hex(active ? 0x00CC66 : 0x888888), 0);
+          }
+          if (mppt_error.length() > 0 && mppt_error != "No error") {
+            lv_label_set_text(id(solar_status_error_label), mppt_error.c_str());
+            lv_obj_clear_flag(id(solar_status_error_label), LV_OBJ_FLAG_HIDDEN);
+          } else {
+            lv_obj_add_flag(id(solar_status_error_label), LV_OBJ_FLAG_HIDDEN);
+          }
+          if (!std::isnan(pv_power)) {
+            snprintf(buf, sizeof(buf), "PV Power: %.0f W", pv_power);
+            lv_label_set_text(id(solar_status_pv_label), buf);
+          }
+          if (!std::isnan(mppt_i)) {
+            snprintf(buf, sizeof(buf), "Batt Current: %.1f A", mppt_i);
+            lv_label_set_text(id(solar_status_current_label), buf);
+          }
+          if (!std::isnan(mppt_bat_power)) {
+            snprintf(buf, sizeof(buf), "Batt Power: %.0f W", mppt_bat_power);
+            lv_label_set_text(id(solar_status_power_label), buf);
+          }
+          if (!std::isnan(yield_today)) {
+            snprintf(buf, sizeof(buf), "Yield Today: %.2f kWh", yield_today);
+            lv_label_set_text(id(solar_status_yield_label), buf);
+          }
+
+          // Battery Live (27)
+          if (!std::isnan(soc)) {
+            lv_arc_set_value(id(batt_live_arc), (int)soc);
+            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            lv_label_set_text(id(batt_live_soc_label), buf);
+          }
+          if (!std::isnan(shunt_v)) {
+            snprintf(buf, sizeof(buf), "%.2f V", shunt_v);
+            lv_label_set_text(id(batt_live_voltage_label), buf);
+          }
+
+          // Battery Detail (28)
+          if (!std::isnan(shunt_v)) {
+            snprintf(buf, sizeof(buf), "%.2f V", shunt_v);
+            lv_label_set_text(id(batt_detail_voltage_label), buf);
+          }
+          if (!std::isnan(shunt_i)) {
+            snprintf(buf, sizeof(buf), "%+.1f A", shunt_i);
+            lv_label_set_text(id(batt_detail_current_label), buf);
+            lv_obj_set_style_text_color(id(batt_detail_current_label),
+              lv_color_hex(shunt_i >= 0 ? 0x00CC66 : 0xFF8800), 0);
+          }
+          if (!std::isnan(consumed_ah)) {
+            snprintf(buf, sizeof(buf), "Consumed: %.1f Ah", consumed_ah);
+            lv_label_set_text(id(batt_detail_consumed_label), buf);
+          }
+          if (!std::isnan(shunt_temp)) {
+            snprintf(buf, sizeof(buf), "Temp: %.0f \u00B0C", shunt_temp);
+            lv_label_set_text(id(batt_detail_temp_label), buf);
+          }
+          if (!std::isnan(ttg) && ttg > 0) {
+            int mins = (int)ttg;
+            if (mins >= 60) {
+              snprintf(buf, sizeof(buf), "TTG: %dh %dm", mins / 60, mins % 60);
+            } else {
+              snprintf(buf, sizeof(buf), "TTG: %dm", mins);
+            }
+            lv_label_set_text(id(batt_detail_ttg_label), buf);
+          } else if (!std::isnan(shunt_i) && shunt_i > 0) {
+            lv_label_set_text(id(batt_detail_ttg_label), "Charging");
+          }
+
+          // Battery History (29)
+          {
+            auto now_ts = id(sntp_time).now().timestamp;
+            float vmin = shunt_voltage_hist.get_min(now_ts);
+            float vmax = shunt_voltage_hist.get_max(now_ts);
+            if (!std::isnan(vmin) && !std::isnan(vmax)) {
+              snprintf(buf, sizeof(buf), "%.1f \u2014 %.1f V", vmin, vmax);
+              lv_label_set_text(id(batt_hist_voltage_label), buf);
+            }
+            float smin = shunt_soc_hist.get_min(now_ts);
+            float smax = shunt_soc_hist.get_max(now_ts);
+            if (!std::isnan(smin) && !std::isnan(smax)) {
+              snprintf(buf, sizeof(buf), "%.0f \u2014 %.0f %%", smin, smax);
+              lv_label_set_text(id(batt_hist_soc_label), buf);
+            }
+            float imin = shunt_current_hist.get_min(now_ts);
+            float imax = shunt_current_hist.get_max(now_ts);
+            if (!std::isnan(imin) && !std::isnan(imax)) {
+              snprintf(buf, sizeof(buf), "%.1f \u2014 %.1f A", imin, imax);
+              lv_label_set_text(id(batt_hist_current_label), buf);
+            }
+          }
+
+          // Mains Live (30)
+          if (!std::isnan(mains_power)) {
+            lv_arc_set_value(id(mains_live_arc), (int)mains_power);
+            snprintf(buf, sizeof(buf), "%.0f W", mains_power);
+            lv_label_set_text(id(mains_live_power_label), buf);
+          }
+          if (!std::isnan(mains_i)) {
+            snprintf(buf, sizeof(buf), "%.1f A", mains_i);
+            lv_label_set_text(id(mains_live_current_label), buf);
+          }
+
+          // Mains Status (31)
+          if (mains_state.length() > 0) {
+            lv_label_set_text(id(mains_status_state_label), mains_state.c_str());
+            bool active = (mains_state != "Off");
+            lv_obj_set_style_text_color(id(mains_status_state_label),
+              lv_color_hex(active ? 0x00CC66 : 0x888888), 0);
+          }
+          if (mains_error.length() > 0 && mains_error != "No error") {
+            lv_label_set_text(id(mains_status_error_label), mains_error.c_str());
+            lv_obj_clear_flag(id(mains_status_error_label), LV_OBJ_FLAG_HIDDEN);
+          } else {
+            lv_obj_add_flag(id(mains_status_error_label), LV_OBJ_FLAG_HIDDEN);
+          }
+          if (!std::isnan(mains_power)) {
+            snprintf(buf, sizeof(buf), "Batt Power: %.0f W", mains_power);
+            lv_label_set_text(id(mains_status_power_label), buf);
+          }
+          if (!std::isnan(mains_i)) {
+            snprintf(buf, sizeof(buf), "Batt Current: %.1f A", mains_i);
+            lv_label_set_text(id(mains_status_current_label), buf);
+          }
+          if (!std::isnan(mains_v)) {
+            snprintf(buf, sizeof(buf), "Batt Voltage: %.2f V", mains_v);
+            lv_label_set_text(id(mains_status_voltage_label), buf);
+          }
+          if (!std::isnan(mains_ac)) {
+            snprintf(buf, sizeof(buf), "AC Current: %.1f A", mains_ac);
+            lv_label_set_text(id(mains_status_ac_label), buf);
+          }
+
+          // Mains History (32)
+          {
+            auto now_ts = id(sntp_time).now().timestamp;
+            float pmin = mains_power_hist.get_min(now_ts);
+            float pmax = mains_power_hist.get_max(now_ts);
+            if (!std::isnan(pmin) && !std::isnan(pmax)) {
+              snprintf(buf, sizeof(buf), "%.0f \u2014 %.0f W", pmin, pmax);
+              lv_label_set_text(id(mains_hist_power_label), buf);
+            }
+            float cmin = mains_current_hist.get_min(now_ts);
+            float cmax = mains_current_hist.get_max(now_ts);
+            if (!std::isnan(cmin) && !std::isnan(cmax)) {
+              snprintf(buf, sizeof(buf), "%.1f \u2014 %.1f A", cmin, cmax);
+              lv_label_set_text(id(mains_hist_current_label), buf);
+            }
+          }
+
 # 1. The "Hello World" Text
   - interval: 5s
     then:
@@ -2859,18 +4133,22 @@ text_sensor:
   - platform: victron_ble
     victron_ble_id: victron_mppt
     name: "MPPT Device State"
+    id: mppt_device_state
     type: DEVICE_STATE
   - platform: victron_ble
     victron_ble_id: victron_mppt
     name: "MPPT Charger Error"
+    id: mppt_charger_error
     type: CHARGER_ERROR
   - platform: victron_ble
     victron_ble_id: victron_charger
     name: "Mains Device State"
+    id: mains_device_state
     type: DEVICE_STATE
   - platform: victron_ble
     victron_ble_id: victron_charger
     name: "Mains Charger Error"
+    id: mains_charger_error
     type: CHARGER_ERROR
 
 sensor:
@@ -2930,12 +4208,17 @@ sensor:
     id: shunt_voltage
     type: BATTERY_VOLTAGE
     on_value:
-      - lambda: "id(shunt_last_ms) = millis();"
+      - lambda: |-
+          id(shunt_last_ms) = millis();
+          if (!std::isnan(x)) shunt_voltage_hist.record(x, id(sntp_time).now().timestamp);
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt Battery Current"
     id: shunt_current
     type: BATTERY_CURRENT
+    on_value:
+      - lambda: |-
+          if (!std::isnan(x)) shunt_current_hist.record(x, id(sntp_time).now().timestamp);
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt Time To Go"
@@ -2944,16 +4227,21 @@ sensor:
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt Consumed Ah"
+    id: shunt_consumed_ah
     type: CONSUMED_AH
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt Temperature"
+    id: shunt_temperature
     type: TEMPERATURE
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt SOC"
     id: shunt_soc
     type: STATE_OF_CHARGE
+    on_value:
+      - lambda: |-
+          if (!std::isnan(x)) shunt_soc_hist.record(x, id(sntp_time).now().timestamp);
 
   # --- Victron MPPT (solar_charger) ---
   - platform: victron_ble
@@ -2962,7 +4250,9 @@ sensor:
     id: mppt_pv_power
     type: PV_POWER
     on_value:
-      - lambda: "id(mppt_last_ms) = millis();"
+      - lambda: |-
+          id(mppt_last_ms) = millis();
+          if (!std::isnan(x)) solar_power_hist.record(x, id(sntp_time).now().timestamp);
   - platform: victron_ble
     victron_ble_id: victron_mppt
     name: "MPPT Battery Current"
@@ -2976,12 +4266,14 @@ sensor:
   - platform: victron_ble
     victron_ble_id: victron_mppt
     name: "MPPT Yield Today"
+    id: mppt_yield_today
     type: YIELD_TODAY
 
   # --- Victron Mains Charger (ac_charger) ---
   - platform: victron_ble
     victron_ble_id: victron_charger
     name: "Mains Battery Voltage"
+    id: mains_voltage
     type: BATTERY_VOLTAGE
     on_value:
       - lambda: "id(charger_last_ms) = millis();"
@@ -2990,14 +4282,21 @@ sensor:
     name: "Mains Battery Current"
     id: mains_battery_current
     type: BATTERY_CURRENT
+    on_value:
+      - lambda: |-
+          if (!std::isnan(x)) mains_current_hist.record(x, id(sntp_time).now().timestamp);
   - platform: victron_ble
     victron_ble_id: victron_charger
     name: "Mains Battery Power"
     id: mains_battery_power
     type: BATTERY_POWER
+    on_value:
+      - lambda: |-
+          if (!std::isnan(x)) mains_power_hist.record(x, id(sntp_time).now().timestamp);
   - platform: victron_ble
     victron_ble_id: victron_charger
     name: "Mains AC Current"
+    id: mains_ac_current
     type: AC_CURRENT
 
   # --- ThermoPro BLE temperature/humidity sensors ---
