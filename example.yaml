@@ -195,6 +195,7 @@ font:
       - "\U000F0079"  # mdi-battery
       - "\U000F008E"  # mdi-battery-charging
       - "\U000F192D"  # mdi-transmission-tower-import
+      - "\U000F0D3E"  # mdi-transmission-tower
       - "\U000F0493"  # mdi-cog
       - "\U000F0141"  # mdi-chevron-left
       - "\U000F0142"  # mdi-chevron-right
@@ -484,7 +485,7 @@ lvgl:
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
@@ -587,7 +588,7 @@ lvgl:
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       widgets:
         - button:
             align: CENTER
@@ -692,11 +693,11 @@ lvgl:
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_up:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
       on_swipe_down:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
@@ -768,7 +769,7 @@ lvgl:
       on_swipe_up:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
       on_swipe_down:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
@@ -838,7 +839,7 @@ lvgl:
       on_swipe_up:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(1, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
       on_swipe_down:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
@@ -849,7 +850,7 @@ lvgl:
             width: 260
             height: 260
             min_value: 0
-            max_value: 30
+            max_value: 500
             value: 0
             start_angle: 135
             end_angle: 45
@@ -871,13 +872,13 @@ lvgl:
             id: charger_value_label
             align: CENTER
             y: 15
-            text: "-- V"
+            text: "-- W"
             text_font: roboto48
             text_color: 0xFFFFFF
         - label:
             align: BOTTOM_MID
             y: -50
-            text: "Charger"
+            text: "Charger Power"
             text_font: roboto32
             text_color: 0x666666
 
@@ -1775,22 +1776,168 @@ lvgl:
                   text_font: mdi48
                   text_color: 0xFFFFFF
 
+    # === Page 15: Power Flow ===
+    - id: flow_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(0, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_down:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(4, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 200);
+      on_swipe_up:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        # --- Solar icon (top center) ---
+        - label:
+            align: TOP_MID
+            y: 60
+            text: "\U000F0A72"
+            text_font: mdi48
+            text_color: 0xFFCC00
+        - label:
+            id: flow_solar_label
+            align: TOP_MID
+            y: 112
+            text: "-- A"
+            text_font: roboto24
+            text_color: 0xFFCC00
+        # --- Flow line: Solar → Battery (vertical) ---
+        - obj:
+            id: flow_line_solar
+            align: CENTER
+            x: 0
+            y: -40
+            width: 4
+            height: 40
+            bg_color: 0x333333
+            bg_opa: 100%
+            border_width: 0
+            radius: 2
+        # --- Battery icon (center) ---
+        - label:
+            id: flow_battery_icon
+            align: CENTER
+            y: 0
+            text: "\U000F0079"
+            text_font: mdi48
+            text_color: 0x00CC66
+        - label:
+            id: flow_battery_label
+            align: CENTER
+            y: 45
+            text: "-- %"
+            text_font: roboto24
+            text_color: 0x00CC66
+        # --- Flow line: Battery → Van (horizontal left) ---
+        - obj:
+            id: flow_line_van
+            align: CENTER
+            x: -75
+            y: 8
+            width: 50
+            height: 4
+            bg_color: 0x333333
+            bg_opa: 100%
+            border_width: 0
+            radius: 2
+        # --- Van icon (left) ---
+        - label:
+            align: CENTER
+            x: -130
+            y: 0
+            text: "\U000F07FA"
+            text_font: mdi48
+            text_color: 0xFF8800
+        - label:
+            id: flow_van_label
+            align: CENTER
+            x: -130
+            y: 45
+            text: "-- A"
+            text_font: roboto24
+            text_color: 0xFF8800
+        # --- Flow line: Battery → Mains (horizontal right) ---
+        - obj:
+            id: flow_line_mains
+            align: CENTER
+            x: 75
+            y: 8
+            width: 50
+            height: 4
+            bg_color: 0x333333
+            bg_opa: 100%
+            border_width: 0
+            radius: 2
+        # --- Mains icon (right) ---
+        - label:
+            align: CENTER
+            x: 130
+            y: 0
+            text: "\U000F0D3E"
+            text_font: mdi48
+            text_color: 0x00CCCC
+        - label:
+            id: flow_mains_label
+            align: CENTER
+            x: 130
+            y: 45
+            text: "-- A"
+            text_font: roboto24
+            text_color: 0x00CCCC
+        # --- Time-to-go label (below center) ---
+        - label:
+            id: flow_ttg_label
+            align: CENTER
+            x: 0
+            y: 120
+            text: ""
+            text_align: CENTER
+            text_font: roboto24
+            text_color: 0xAAAAAA
+
 interval:
+  - interval: 50ms
+    then:
+      - lambda: |-
+          // Fast poll for touch wake when screen is off
+          if (id(screen_state) != 2) return;
+          int gpio4 = gpio_get_level(GPIO_NUM_4);
+          if (gpio4 == 0) {
+            ESP_LOGW("screen", "WAKE: GPIO4 LOW while screen off");
+            id(backlight).set_level(1.0);
+            id(backlight).turn_on();
+            id(lvgl_comp)->set_paused(false, false);
+            id(screen_state) = 0;
+          }
   - interval: 500ms
     then:
       - lambda: |-
           int state = id(screen_state);
-          if (state == 2) {
-            // Screen is off — poll GPIO4 for touch wake
-            int gpio4 = gpio_get_level(GPIO_NUM_4);
-            if (gpio4 == 0) {
-              ESP_LOGW("screen", "WAKE: GPIO4 LOW while screen off");
-              id(backlight).set_level(1.0);
-              id(backlight).turn_on();
-              id(lvgl_comp)->set_paused(false, false);
-              id(screen_state) = 0;
-            }
-          } else {
+          if (state == 2) return;  // Wake handled by fast poll
+          {
             uint32_t idle_ms = lv_disp_get_inactive_time(NULL);
             int dim_s = id(dim_timeout_sec);
             int off_s = id(off_timeout_sec);
@@ -1816,6 +1963,138 @@ interval:
               id(backlight).set_level(1.0);
               id(screen_state) = 0;
             }
+          }  // end block
+
+  - interval: 2s
+    then:
+      - lambda: |-
+          // --- Power Flow page + sub-page updates ---
+          char buf[32];
+
+          // Read sensors (NaN if not yet received)
+          float pv_power = id(mppt_pv_power).state;
+          float mains_power = id(mains_battery_power).state;
+          float shunt_v = id(shunt_voltage).state;
+          float shunt_i = id(shunt_current).state;
+          float soc = id(shunt_soc).state;
+          float mppt_i = id(mppt_battery_current).state;
+          float mains_i = id(mains_battery_current).state;
+          float ttg = id(shunt_ttg).state;
+
+          // --- Flow page labels (amps) ---
+          if (std::isnan(mppt_i)) {
+            lv_label_set_text(id(flow_solar_label), "-- A");
+          } else {
+            snprintf(buf, sizeof(buf), "%.1f A", mppt_i);
+            lv_label_set_text(id(flow_solar_label), buf);
+          }
+
+          if (std::isnan(soc)) {
+            lv_label_set_text(id(flow_battery_label), "-- %");
+          } else {
+            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            lv_label_set_text(id(flow_battery_label), buf);
+          }
+
+          if (std::isnan(mains_i)) {
+            lv_label_set_text(id(flow_mains_label), "-- A");
+          } else {
+            snprintf(buf, sizeof(buf), "%.1f A", mains_i);
+            lv_label_set_text(id(flow_mains_label), buf);
+          }
+
+          // Van load current = MPPT battery current + Mains battery current - Shunt current
+          float van_i = NAN;
+          if (!std::isnan(shunt_i)) {
+            float mi = std::isnan(mppt_i) ? 0.0f : mppt_i;
+            float ci = std::isnan(mains_i) ? 0.0f : mains_i;
+            van_i = mi + ci - shunt_i;
+            if (van_i < 0) van_i = 0;
+          }
+          if (std::isnan(van_i)) {
+            lv_label_set_text(id(flow_van_label), "-- A");
+          } else {
+            snprintf(buf, sizeof(buf), "%.1f A", van_i);
+            lv_label_set_text(id(flow_van_label), buf);
+          }
+
+          // --- Battery icon: charging vs normal ---
+          if (!std::isnan(shunt_i) && shunt_i > 0) {
+            lv_label_set_text(id(flow_battery_icon), "\U000F008E");  // mdi-battery-charging
+          } else {
+            lv_label_set_text(id(flow_battery_icon), "\U000F0079");  // mdi-battery
+          }
+
+          // --- Flow line colors (amps threshold) ---
+          lv_color_t idle = lv_color_hex(0x333333);
+          // Solar line: yellow when > 0.1A
+          if (!std::isnan(mppt_i) && mppt_i > 0.1f) {
+            lv_obj_set_style_bg_color(id(flow_line_solar), lv_color_hex(0xFFCC00), 0);
+          } else {
+            lv_obj_set_style_bg_color(id(flow_line_solar), idle, 0);
+          }
+          // Van line: orange when van load > 0.1A
+          if (!std::isnan(van_i) && van_i > 0.1f) {
+            lv_obj_set_style_bg_color(id(flow_line_van), lv_color_hex(0xFF8800), 0);
+          } else {
+            lv_obj_set_style_bg_color(id(flow_line_van), idle, 0);
+          }
+          // Mains line: cyan when mains > 0.1A
+          if (!std::isnan(mains_i) && mains_i > 0.1f) {
+            lv_obj_set_style_bg_color(id(flow_line_mains), lv_color_hex(0x00CCCC), 0);
+          } else {
+            lv_obj_set_style_bg_color(id(flow_line_mains), idle, 0);
+          }
+
+          // --- Time-to-go display ---
+          if (!std::isnan(ttg) && ttg > 0) {
+            int mins = (int)ttg;
+            if (mins >= 1440) {
+              int days = mins / 1440;
+              int hrs = (mins % 1440) / 60;
+              snprintf(buf, sizeof(buf), "%dd %dh", days, hrs);
+            } else if (mins >= 60) {
+              int hrs = mins / 60;
+              int m = mins % 60;
+              snprintf(buf, sizeof(buf), "%dh %dm", hrs, m);
+            } else {
+              snprintf(buf, sizeof(buf), "%dm", mins);
+            }
+            char ttg_buf[48];
+            snprintf(ttg_buf, sizeof(ttg_buf), "Discharge Time\n%s", buf);
+            lv_label_set_text(id(flow_ttg_label), ttg_buf);
+            lv_obj_clear_flag(id(flow_ttg_label), LV_OBJ_FLAG_HIDDEN);
+          } else {
+            lv_obj_add_flag(id(flow_ttg_label), LV_OBJ_FLAG_HIDDEN);
+          }
+
+          // --- TTG background color alerts on flow page ---
+          if (!std::isnan(ttg) && ttg > 0 && ttg < 120) {
+            lv_obj_set_style_bg_color(id(flow_page).obj, lv_color_hex(0x440000), 0);
+          } else if (!std::isnan(ttg) && ttg > 0 && ttg < 300) {
+            lv_obj_set_style_bg_color(id(flow_page).obj, lv_color_hex(0x443300), 0);
+          } else {
+            lv_obj_set_style_bg_color(id(flow_page).obj, lv_color_hex(0x000000), 0);
+          }
+
+          // --- Sub-page arcs + labels (still use power sensors) ---
+          // Battery sub-page
+          if (!std::isnan(soc)) {
+            lv_arc_set_value(id(battery_arc), (int)soc);
+            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            lv_label_set_text(id(battery_value_label), buf);
+          }
+          // Solar sub-page
+          if (!std::isnan(pv_power)) {
+            lv_arc_set_value(id(solar_arc), (int)pv_power);
+            snprintf(buf, sizeof(buf), "%.0f W", pv_power);
+            lv_label_set_text(id(solar_value_label), buf);
+          }
+          // Charger sub-page
+          if (!std::isnan(mains_power)) {
+            lv_arc_set_value(id(charger_arc), (int)mains_power);
+            snprintf(buf, sizeof(buf), "%.0f W", mains_power);
+            lv_label_set_text(id(charger_value_label), buf);
           }
 
 # 1. The "Hello World" Text
@@ -2031,16 +2310,19 @@ sensor:
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt Battery Voltage"
+    id: shunt_voltage
     type: BATTERY_VOLTAGE
     on_value:
       - lambda: "id(shunt_last_ms) = millis();"
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt Battery Current"
+    id: shunt_current
     type: BATTERY_CURRENT
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt Time To Go"
+    id: shunt_ttg
     type: TIME_TO_GO
   - platform: victron_ble
     victron_ble_id: victron_shunt
@@ -2053,22 +2335,26 @@ sensor:
   - platform: victron_ble
     victron_ble_id: victron_shunt
     name: "Shunt SOC"
+    id: shunt_soc
     type: STATE_OF_CHARGE
 
   # --- Victron MPPT (solar_charger) ---
   - platform: victron_ble
     victron_ble_id: victron_mppt
     name: "MPPT PV Power"
+    id: mppt_pv_power
     type: PV_POWER
     on_value:
       - lambda: "id(mppt_last_ms) = millis();"
   - platform: victron_ble
     victron_ble_id: victron_mppt
     name: "MPPT Battery Current"
+    id: mppt_battery_current
     type: BATTERY_CURRENT
   - platform: victron_ble
     victron_ble_id: victron_mppt
     name: "MPPT Battery Power"
+    id: mppt_battery_power
     type: BATTERY_POWER
   - platform: victron_ble
     victron_ble_id: victron_mppt
@@ -2085,12 +2371,34 @@ sensor:
   - platform: victron_ble
     victron_ble_id: victron_charger
     name: "Mains Battery Current"
+    id: mains_battery_current
     type: BATTERY_CURRENT
   - platform: victron_ble
     victron_ble_id: victron_charger
     name: "Mains Battery Power"
+    id: mains_battery_power
     type: BATTERY_POWER
   - platform: victron_ble
     victron_ble_id: victron_charger
     name: "Mains AC Current"
     type: AC_CURRENT
+
+  # --- ThermoPro BLE temperature/humidity sensors ---
+  - platform: thermopro_ble
+    mac_address: !secret thermopro_tp357_mac
+    temperature:
+      name: "Van Temperature"
+    humidity:
+      name: "Van Humidity"
+  - platform: thermopro_ble
+    mac_address: !secret thermopro_tp351a_mac
+    temperature:
+      name: "Outside Temperature"
+    humidity:
+      name: "Outside Humidity"
+  - platform: thermopro_ble
+    mac_address: !secret thermopro_tp351b_mac
+    temperature:
+      name: "Fridge Temperature"
+    humidity:
+      name: "Fridge Humidity"
