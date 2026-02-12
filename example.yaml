@@ -179,7 +179,7 @@ font:
     bpp: 4
     glyphs:
       - "\U000F0A72"  # mdi-solar-power (Power group)
-      - "\U000F092F"  # mdi-wifi (System group)
+      - "\U000F092F"  # mdi-wifi-strength-outline (System group)
       - "\U000F0493"  # mdi-cog (Settings)
   - file:
       type: web
@@ -188,7 +188,7 @@ font:
     size: 48
     bpp: 4
     glyphs:
-      - "\U000F092F"  # mdi-wifi
+      - "\U000F092F"  # mdi-wifi-strength-outline
       - "\U000F050F"  # mdi-thermometer
       - "\U000F07FA"  # mdi-van-passenger
       - "\U000F0A72"  # mdi-solar-power
@@ -1944,12 +1944,6 @@ interval:
           }
 
 text_sensor:
-  - platform: template
-    name: "Van Dashboard Status"
-    icon: "mdi:robot-happy"
-    lambda: |-
-      return {"Hello World - System Online"};
-    update_interval: 60s
   - platform: wifi_info
     ip_address:
       id: device_ip
@@ -1961,6 +1955,27 @@ text_sensor:
   - platform: version
     id: device_version
     hide_timestamp: true
+  # --- Victron BLE text sensors ---
+  - platform: victron_ble
+    victron_ble_id: victron_shunt
+    name: "Shunt Device State"
+    type: DEVICE_STATE
+  - platform: victron_ble
+    victron_ble_id: victron_mppt
+    name: "MPPT Device State"
+    type: DEVICE_STATE
+  - platform: victron_ble
+    victron_ble_id: victron_mppt
+    name: "MPPT Charger Error"
+    type: CHARGER_ERROR
+  - platform: victron_ble
+    victron_ble_id: victron_charger
+    name: "Mains Device State"
+    type: DEVICE_STATE
+  - platform: victron_ble
+    victron_ble_id: victron_charger
+    name: "Mains Charger Error"
+    type: CHARGER_ERROR
 
 sensor:
   - platform: debug
@@ -2012,50 +2027,70 @@ sensor:
     name: "Dashboard Uptime"
     entity_category: "diagnostic"
 
-  # 5. Victron MPPT — Solar Panel Power
+  # --- Victron SmartShunt (battery_monitor) ---
+  - platform: victron_ble
+    victron_ble_id: victron_shunt
+    name: "Shunt Battery Voltage"
+    type: BATTERY_VOLTAGE
+    on_value:
+      - lambda: "id(shunt_last_ms) = millis();"
+  - platform: victron_ble
+    victron_ble_id: victron_shunt
+    name: "Shunt Battery Current"
+    type: BATTERY_CURRENT
+  - platform: victron_ble
+    victron_ble_id: victron_shunt
+    name: "Shunt Time To Go"
+    type: TIME_TO_GO
+  - platform: victron_ble
+    victron_ble_id: victron_shunt
+    name: "Shunt Consumed Ah"
+    type: CONSUMED_AH
+  - platform: victron_ble
+    victron_ble_id: victron_shunt
+    name: "Shunt Temperature"
+    type: TEMPERATURE
+  - platform: victron_ble
+    victron_ble_id: victron_shunt
+    name: "Shunt SOC"
+    type: STATE_OF_CHARGE
+
+  # --- Victron MPPT (solar_charger) ---
   - platform: victron_ble
     victron_ble_id: victron_mppt
-    name: "Solar Power"
+    name: "MPPT PV Power"
     type: PV_POWER
     on_value:
       - lambda: "id(mppt_last_ms) = millis();"
-      - lvgl.label.update:
-          id: solar_value_label
-          text:
-            format: "%.0f W"
-            args: [ 'x' ]
-      - lvgl.arc.update:
-          id: solar_arc
-          value: !lambda "return (int)x;"
-
-  # 6. Victron SmartShunt — Battery State of Charge
   - platform: victron_ble
-    victron_ble_id: victron_shunt
-    name: "Battery SOC"
-    type: STATE_OF_CHARGE
-    on_value:
-      - lambda: "id(shunt_last_ms) = millis();"
-      - lvgl.label.update:
-          id: battery_value_label
-          text:
-            format: "%.0f %%"
-            args: [ 'x' ]
-      - lvgl.arc.update:
-          id: battery_arc
-          value: !lambda "return (int)x;"
+    victron_ble_id: victron_mppt
+    name: "MPPT Battery Current"
+    type: BATTERY_CURRENT
+  - platform: victron_ble
+    victron_ble_id: victron_mppt
+    name: "MPPT Battery Power"
+    type: BATTERY_POWER
+  - platform: victron_ble
+    victron_ble_id: victron_mppt
+    name: "MPPT Yield Today"
+    type: YIELD_TODAY
 
-  # 7. Victron Mains Charger — Battery Voltage
+  # --- Victron Mains Charger (ac_charger) ---
   - platform: victron_ble
     victron_ble_id: victron_charger
-    name: "Charger Voltage"
+    name: "Mains Battery Voltage"
     type: BATTERY_VOLTAGE
     on_value:
       - lambda: "id(charger_last_ms) = millis();"
-      - lvgl.label.update:
-          id: charger_value_label
-          text:
-            format: "%.1f V"
-            args: [ 'x' ]
-      - lvgl.arc.update:
-          id: charger_arc
-          value: !lambda "return (int)x;"
+  - platform: victron_ble
+    victron_ble_id: victron_charger
+    name: "Mains Battery Current"
+    type: BATTERY_CURRENT
+  - platform: victron_ble
+    victron_ble_id: victron_charger
+    name: "Mains Battery Power"
+    type: BATTERY_POWER
+  - platform: victron_ble
+    victron_ble_id: victron_charger
+    name: "Mains AC Current"
+    type: AC_CURRENT
