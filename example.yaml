@@ -28,6 +28,8 @@ esphome:
                 break;
               }
             }
+            // Boot to Flow page instead of Splash
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_NONE, 0);
 
 packages:
   waveshare_display: github://gjdodd/esphome-packages/waveshare-esp32-s3-touch-lcd-146b.yaml@main
@@ -208,6 +210,7 @@ font:
       - "\U000F0317"  # mdi-lan (ping)
       - "\U000F01E7"  # mdi-earth (DNS)
       - "\U000F0156"  # mdi-close (stop)
+      - "\U000F058C"  # mdi-water-percent
   - file: "gfonts://Roboto"
     id: roboto24
     size: 24
@@ -469,25 +472,26 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_set_width(id(dots_container), 82);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
             id(settings_visible) = false;
       on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
-      on_swipe_right:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       widgets:
         - label:
             align: CENTER
@@ -568,18 +572,19 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_set_width(id(dots_container), 82);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -588,7 +593,7 @@ lvgl:
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       widgets:
         - button:
             align: CENTER
@@ -622,21 +627,24 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_set_width(id(dots_container), 82);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(0, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -1782,27 +1790,26 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 64);
+            lv_obj_set_width(id(dots_container), 82);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
-        - lambda: |-
-            lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(0, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       on_swipe_down:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -1917,6 +1924,371 @@ lvgl:
             text_align: CENTER
             text_font: roboto24
             text_color: 0xAAAAAA
+
+    # === Page 16: Temperature Hub ===
+    - id: temp_hub_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 82);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(2, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_down:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(17, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 200);
+      on_swipe_up:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - button:
+            align: CENTER
+            width: 300
+            height: 300
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  lv_indev_wait_release(lv_indev_get_act());
+                  id(lvgl_comp)->show_page(17, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 200);
+            widgets:
+              # Thermometer icon at top
+              - label:
+                  align: CENTER
+                  y: -100
+                  text: "\U000F050F"
+                  text_font: mdi48
+                  text_color: 0xFF6600
+              # --- Van row ---
+              - label:
+                  align: CENTER
+                  x: -80
+                  y: -40
+                  text: "Van"
+                  text_font: roboto24
+                  text_color: 0x888888
+              - label:
+                  id: temp_van_val
+                  align: CENTER
+                  x: 10
+                  y: -40
+                  text: "-- °C"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
+              - label:
+                  id: humid_van_val
+                  align: CENTER
+                  x: 100
+                  y: -40
+                  text: "--%"
+                  text_font: roboto24
+                  text_color: 0x6699AA
+              # --- Outside row ---
+              - label:
+                  align: CENTER
+                  x: -80
+                  y: 20
+                  text: "Outside"
+                  text_font: roboto24
+                  text_color: 0x888888
+              - label:
+                  id: temp_outside_val
+                  align: CENTER
+                  x: 10
+                  y: 20
+                  text: "-- °C"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
+              - label:
+                  id: humid_outside_val
+                  align: CENTER
+                  x: 100
+                  y: 20
+                  text: "--%"
+                  text_font: roboto24
+                  text_color: 0x6699AA
+              # --- Fridge row ---
+              - label:
+                  align: CENTER
+                  x: -80
+                  y: 80
+                  text: "Fridge"
+                  text_font: roboto24
+                  text_color: 0x888888
+              - label:
+                  id: temp_fridge_val
+                  align: CENTER
+                  x: 10
+                  y: 80
+                  text: "-- °C"
+                  text_font: roboto32
+                  text_color: 0xFFFFFF
+              - label:
+                  id: humid_fridge_val
+                  align: CENTER
+                  x: 100
+                  y: 80
+                  text: "--%"
+                  text_font: roboto24
+                  text_color: 0x6699AA
+
+    # === Page 17: Van Temperature (Temp sub) ===
+    - id: van_temp_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(18, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: van_temp_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: 0
+            max_value: 50
+            value: 0
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0xFF6600
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -40
+            text: "\U000F050F"
+            text_font: mdi48
+            text_color: 0xFF6600
+        - label:
+            id: van_temp_label
+            align: CENTER
+            y: 15
+            text: "-- °C"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            id: van_humid_label
+            align: CENTER
+            y: 60
+            text: "-- %"
+            text_font: roboto32
+            text_color: 0x6699AA
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "Van"
+            text_font: roboto32
+            text_color: 0x666666
+
+    # === Page 18: Outside Temperature (Temp sub) ===
+    - id: outside_temp_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(19, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(17, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: outside_temp_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: 0
+            max_value: 50
+            value: 0
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0xFF6600
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -40
+            text: "\U000F050F"
+            text_font: mdi48
+            text_color: 0xFF6600
+        - label:
+            id: outside_temp_label
+            align: CENTER
+            y: 15
+            text: "-- °C"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            id: outside_humid_label
+            align: CENTER
+            y: 60
+            text: "-- %"
+            text_font: roboto32
+            text_color: 0x6699AA
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "Outside"
+            text_font: roboto32
+            text_color: 0x666666
+
+    # === Page 19: Fridge Temperature (Temp sub) ===
+    - id: fridge_temp_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 46);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(18, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - arc:
+            id: fridge_temp_arc
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            min_value: 0
+            max_value: 50
+            value: 0
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            arc_width: 14
+            arc_color: 0x333333
+            arc_rounded: true
+            indicator:
+              arc_color: 0xFF6600
+              arc_width: 14
+              arc_rounded: true
+        - label:
+            align: CENTER
+            y: -40
+            text: "\U000F050F"
+            text_font: mdi48
+            text_color: 0xFF6600
+        - label:
+            id: fridge_temp_label
+            align: CENTER
+            y: 15
+            text: "-- °C"
+            text_font: roboto48
+            text_color: 0xFFFFFF
+        - label:
+            id: fridge_humid_label
+            align: CENTER
+            y: 60
+            text: "-- %"
+            text_font: roboto32
+            text_color: 0x6699AA
+        - label:
+            align: BOTTOM_MID
+            y: -50
+            text: "Fridge"
+            text_font: roboto32
+            text_color: 0x666666
 
 interval:
   - interval: 50ms
@@ -2095,6 +2467,87 @@ interval:
             lv_arc_set_value(id(charger_arc), (int)mains_power);
             snprintf(buf, sizeof(buf), "%.0f W", mains_power);
             lv_label_set_text(id(charger_value_label), buf);
+          }
+
+          // --- Temperature hub + sub-page updates ---
+          float vt = id(van_temp).state;
+          float vh = id(van_humidity).state;
+          float ot = id(outside_temp).state;
+          float oh = id(outside_humidity).state;
+          float ft = id(fridge_temp).state;
+          float fh = id(fridge_humidity).state;
+
+          // Hub page labels
+          if (std::isnan(vt)) {
+            lv_label_set_text(id(temp_van_val), "-- \u00B0C");
+          } else {
+            snprintf(buf, sizeof(buf), "%.1f \u00B0C", vt);
+            lv_label_set_text(id(temp_van_val), buf);
+          }
+          if (std::isnan(vh)) {
+            lv_label_set_text(id(humid_van_val), "--%");
+          } else {
+            snprintf(buf, sizeof(buf), "%.0f%%", vh);
+            lv_label_set_text(id(humid_van_val), buf);
+          }
+
+          if (std::isnan(ot)) {
+            lv_label_set_text(id(temp_outside_val), "-- \u00B0C");
+          } else {
+            snprintf(buf, sizeof(buf), "%.1f \u00B0C", ot);
+            lv_label_set_text(id(temp_outside_val), buf);
+          }
+          if (std::isnan(oh)) {
+            lv_label_set_text(id(humid_outside_val), "--%");
+          } else {
+            snprintf(buf, sizeof(buf), "%.0f%%", oh);
+            lv_label_set_text(id(humid_outside_val), buf);
+          }
+
+          if (std::isnan(ft)) {
+            lv_label_set_text(id(temp_fridge_val), "-- \u00B0C");
+          } else {
+            snprintf(buf, sizeof(buf), "%.1f \u00B0C", ft);
+            lv_label_set_text(id(temp_fridge_val), buf);
+          }
+          if (std::isnan(fh)) {
+            lv_label_set_text(id(humid_fridge_val), "--%");
+          } else {
+            snprintf(buf, sizeof(buf), "%.0f%%", fh);
+            lv_label_set_text(id(humid_fridge_val), buf);
+          }
+
+          // Van sub-page arc + labels
+          if (!std::isnan(vt)) {
+            lv_arc_set_value(id(van_temp_arc), (int)vt);
+            snprintf(buf, sizeof(buf), "%.1f \u00B0C", vt);
+            lv_label_set_text(id(van_temp_label), buf);
+          }
+          if (!std::isnan(vh)) {
+            snprintf(buf, sizeof(buf), "%.0f %%", vh);
+            lv_label_set_text(id(van_humid_label), buf);
+          }
+
+          // Outside sub-page arc + labels
+          if (!std::isnan(ot)) {
+            lv_arc_set_value(id(outside_temp_arc), (int)ot);
+            snprintf(buf, sizeof(buf), "%.1f \u00B0C", ot);
+            lv_label_set_text(id(outside_temp_label), buf);
+          }
+          if (!std::isnan(oh)) {
+            snprintf(buf, sizeof(buf), "%.0f %%", oh);
+            lv_label_set_text(id(outside_humid_label), buf);
+          }
+
+          // Fridge sub-page arc + labels
+          if (!std::isnan(ft)) {
+            lv_arc_set_value(id(fridge_temp_arc), (int)ft);
+            snprintf(buf, sizeof(buf), "%.1f \u00B0C", ft);
+            lv_label_set_text(id(fridge_temp_label), buf);
+          }
+          if (!std::isnan(fh)) {
+            snprintf(buf, sizeof(buf), "%.0f %%", fh);
+            lv_label_set_text(id(fridge_humid_label), buf);
           }
 
 # 1. The "Hello World" Text
@@ -2387,18 +2840,24 @@ sensor:
   - platform: thermopro_ble
     mac_address: !secret thermopro_tp357_mac
     temperature:
+      id: van_temp
       name: "Van Temperature"
     humidity:
+      id: van_humidity
       name: "Van Humidity"
   - platform: thermopro_ble
     mac_address: !secret thermopro_tp351a_mac
     temperature:
+      id: outside_temp
       name: "Outside Temperature"
     humidity:
+      id: outside_humidity
       name: "Outside Humidity"
   - platform: thermopro_ble
     mac_address: !secret thermopro_tp351b_mac
     temperature:
+      id: fridge_temp
       name: "Fridge Temperature"
     humidity:
+      id: fridge_humidity
       name: "Fridge Humidity"
