@@ -5,12 +5,16 @@ esphome:
   name_add_mac_suffix: false
   includes:
     - includes/net_test.h
+    - includes/temp_history.h
   on_boot:
     - priority: -100
       then:
         - delay: 300ms
         - lambda: |-
             id(touch_glue).begin();
+            van_temp_hist.init();
+            outside_temp_hist.init();
+            fridge_temp_hist.init();
             // Sync value labels with restored global values
             const char* dim_labels[] = {"Never", "15 sec", "30 sec", "1 min", "2 min"};
             int dim_vals[] = {0, 15, 30, 60, 120};
@@ -211,6 +215,12 @@ font:
       - "\U000F01E7"  # mdi-earth (DNS)
       - "\U000F0156"  # mdi-close (stop)
       - "\U000F058C"  # mdi-water-percent
+      - "\U000F0531"  # mdi-tree
+      - "\U000F0290"  # mdi-fridge
+  - file: "gfonts://Roboto"
+    id: roboto28
+    size: 28
+    bpp: 4
   - file: "gfonts://Roboto"
     id: roboto24
     size: 24
@@ -465,6 +475,65 @@ lvgl:
                 text: "Done"
                 text_font: roboto24
                 text_color: 0xCCCCCC
+      - obj:
+          id: temp_minmax_popup
+          align: CENTER
+          width: 412
+          height: 412
+          bg_color: 0x000000
+          bg_opa: 90%
+          border_width: 0
+          radius: 206
+          pad_all: 0
+          opa: LV_OPA_COVER
+          hidden: true
+          widgets:
+            - label:
+                id: minmax_icon_label
+                align: CENTER
+                y: -100
+                text: ""
+                text_font: mdi48
+                text_color: 0x00FF88
+            - label:
+                id: minmax_title_label
+                align: CENTER
+                y: -55
+                text: "24h Range"
+                text_font: roboto24
+                text_color: 0xFFFFFF
+            - label:
+                id: minmax_min_label
+                align: CENTER
+                y: -10
+                text: ""
+                text_font: roboto32
+                text_color: 0x44AADD
+            - label:
+                id: minmax_max_label
+                align: CENTER
+                y: 35
+                text: ""
+                text_font: roboto32
+                text_color: 0xFF6644
+            - button:
+                align: CENTER
+                y: 110
+                width: 80
+                height: 80
+                radius: 40
+                bg_color: 0x444444
+                border_width: 0
+                pad_all: 0
+                on_click:
+                  - lambda: |-
+                      lv_obj_add_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
+                widgets:
+                  - label:
+                      align: CENTER
+                      text: "OK"
+                      text_font: roboto32
+                      text_color: 0xFFFFFF
   pages:
     # === Page 0: Splash ===
     - id: splash_page
@@ -1632,14 +1701,6 @@ lvgl:
         # Screen Dim row
         - label:
             align: CENTER
-            x: -20
-            y: -40
-            text: "\U000F00E2"
-            text_font: mdi32
-            text_color: 0xFFCC00
-        - label:
-            align: CENTER
-            x: 30
             y: -40
             text: "Screen Dim"
             text_font: roboto24
@@ -1709,14 +1770,6 @@ lvgl:
         # Screen Off row
         - label:
             align: CENTER
-            x: -20
-            y: 70
-            text: "\U000F0336"
-            text_font: mdi32
-            text_color: 0xFF6666
-        - label:
-            align: CENTER
-            x: 30
             y: 70
             text: "Screen Off"
             text_font: roboto24
@@ -1829,7 +1882,7 @@ lvgl:
             align: TOP_MID
             y: 112
             text: "-- A"
-            text_font: roboto24
+            text_font: roboto28
             text_color: 0xFFCC00
         # --- Flow line: Solar → Battery (vertical) ---
         - obj:
@@ -1856,7 +1909,7 @@ lvgl:
             align: CENTER
             y: 45
             text: "-- %"
-            text_font: roboto24
+            text_font: roboto28
             text_color: 0x00CC66
         # --- Flow line: Battery → Van (horizontal left) ---
         - obj:
@@ -1884,7 +1937,7 @@ lvgl:
             x: -130
             y: 45
             text: "-- A"
-            text_font: roboto24
+            text_font: roboto28
             text_color: 0xFF8800
         # --- Flow line: Battery → Mains (horizontal right) ---
         - obj:
@@ -1912,17 +1965,26 @@ lvgl:
             x: 130
             y: 45
             text: "-- A"
-            text_font: roboto24
+            text_font: roboto28
             text_color: 0x00CCCC
-        # --- Time-to-go label (below center) ---
+        # --- Time-to-go labels (below center) ---
+        - label:
+            id: flow_ttg_title
+            align: CENTER
+            x: 0
+            y: 105
+            text: ""
+            text_align: CENTER
+            text_font: roboto24
+            text_color: 0xAAAAAA
         - label:
             id: flow_ttg_label
             align: CENTER
             x: 0
-            y: 120
+            y: 135
             text: ""
             text_align: CENTER
-            text_font: roboto24
+            text_font: roboto32
             text_color: 0xAAAAAA
 
     # === Page 16: Temperature Hub ===
@@ -1982,75 +2044,75 @@ lvgl:
                   text_color: 0xFF6600
               # --- Van row ---
               - label:
-                  align: CENTER
-                  x: -80
-                  y: -40
-                  text: "Van"
-                  text_font: roboto24
-                  text_color: 0x888888
-              - label:
                   id: temp_van_val
                   align: CENTER
-                  x: 10
+                  x: -80
                   y: -40
                   text: "-- °C"
                   text_font: roboto32
                   text_color: 0xFFFFFF
+              - label:
+                  align: CENTER
+                  x: 0
+                  y: -40
+                  text: "\U000F07FA"
+                  text_font: mdi48
+                  text_color: 0x00FF88
               - label:
                   id: humid_van_val
                   align: CENTER
-                  x: 100
+                  x: 80
                   y: -40
                   text: "--%"
-                  text_font: roboto24
+                  text_font: roboto32
                   text_color: 0x6699AA
               # --- Outside row ---
               - label:
-                  align: CENTER
-                  x: -80
-                  y: 20
-                  text: "Outside"
-                  text_font: roboto24
-                  text_color: 0x888888
-              - label:
                   id: temp_outside_val
                   align: CENTER
-                  x: 10
+                  x: -80
                   y: 20
                   text: "-- °C"
                   text_font: roboto32
                   text_color: 0xFFFFFF
+              - label:
+                  align: CENTER
+                  x: 0
+                  y: 20
+                  text: "\U000F0531"
+                  text_font: mdi48
+                  text_color: 0x44BB44
               - label:
                   id: humid_outside_val
                   align: CENTER
-                  x: 100
+                  x: 80
                   y: 20
                   text: "--%"
-                  text_font: roboto24
+                  text_font: roboto32
                   text_color: 0x6699AA
               # --- Fridge row ---
               - label:
-                  align: CENTER
-                  x: -80
-                  y: 80
-                  text: "Fridge"
-                  text_font: roboto24
-                  text_color: 0x888888
-              - label:
                   id: temp_fridge_val
                   align: CENTER
-                  x: 10
+                  x: -80
                   y: 80
                   text: "-- °C"
                   text_font: roboto32
                   text_color: 0xFFFFFF
               - label:
+                  align: CENTER
+                  x: 0
+                  y: 80
+                  text: "\U000F0290"
+                  text_font: mdi48
+                  text_color: 0x44AADD
+              - label:
                   id: humid_fridge_val
                   align: CENTER
-                  x: 100
+                  x: 80
                   y: 80
                   text: "--%"
-                  text_font: roboto24
+                  text_font: roboto32
                   text_color: 0x6699AA
 
     # === Page 17: Van Temperature (Temp sub) ===
@@ -2108,9 +2170,9 @@ lvgl:
         - label:
             align: CENTER
             y: -40
-            text: "\U000F050F"
+            text: "\U000F07FA"
             text_font: mdi48
-            text_color: 0xFF6600
+            text_color: 0x00FF88
         - label:
             id: van_temp_label
             align: CENTER
@@ -2131,6 +2193,36 @@ lvgl:
             text: "Van"
             text_font: roboto32
             text_color: 0x666666
+        - button:
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            radius: 130
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - lambda: |-
+                  auto now = id(sntp_time).now().timestamp;
+                  float mn = van_temp_hist.get_min(now);
+                  float mx = van_temp_hist.get_max(now);
+                  char buf[32];
+                  lv_label_set_text(id(minmax_icon_label), "\U000F07FA");
+                  lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0x00FF88), 0);
+                  if (std::isnan(mn)) {
+                    lv_label_set_text(id(minmax_min_label), "Min  -- \u00B0C");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Min  %.1f \u00B0C", mn);
+                    lv_label_set_text(id(minmax_min_label), buf);
+                  }
+                  if (std::isnan(mx)) {
+                    lv_label_set_text(id(minmax_max_label), "Max  -- \u00B0C");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Max  %.1f \u00B0C", mx);
+                    lv_label_set_text(id(minmax_max_label), buf);
+                  }
+                  lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
 
     # === Page 18: Outside Temperature (Temp sub) ===
     - id: outside_temp_page
@@ -2187,9 +2279,9 @@ lvgl:
         - label:
             align: CENTER
             y: -40
-            text: "\U000F050F"
+            text: "\U000F0531"
             text_font: mdi48
-            text_color: 0xFF6600
+            text_color: 0x44BB44
         - label:
             id: outside_temp_label
             align: CENTER
@@ -2210,6 +2302,36 @@ lvgl:
             text: "Outside"
             text_font: roboto32
             text_color: 0x666666
+        - button:
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            radius: 130
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - lambda: |-
+                  auto now = id(sntp_time).now().timestamp;
+                  float mn = outside_temp_hist.get_min(now);
+                  float mx = outside_temp_hist.get_max(now);
+                  char buf[32];
+                  lv_label_set_text(id(minmax_icon_label), "\U000F0531");
+                  lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0x44BB44), 0);
+                  if (std::isnan(mn)) {
+                    lv_label_set_text(id(minmax_min_label), "Min  -- \u00B0C");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Min  %.1f \u00B0C", mn);
+                    lv_label_set_text(id(minmax_min_label), buf);
+                  }
+                  if (std::isnan(mx)) {
+                    lv_label_set_text(id(minmax_max_label), "Max  -- \u00B0C");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Max  %.1f \u00B0C", mx);
+                    lv_label_set_text(id(minmax_max_label), buf);
+                  }
+                  lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
 
     # === Page 19: Fridge Temperature (Temp sub) ===
     - id: fridge_temp_page
@@ -2266,9 +2388,9 @@ lvgl:
         - label:
             align: CENTER
             y: -40
-            text: "\U000F050F"
+            text: "\U000F0290"
             text_font: mdi48
-            text_color: 0xFF6600
+            text_color: 0x44AADD
         - label:
             id: fridge_temp_label
             align: CENTER
@@ -2289,6 +2411,36 @@ lvgl:
             text: "Fridge"
             text_font: roboto32
             text_color: 0x666666
+        - button:
+            align: CENTER
+            y: -10
+            width: 260
+            height: 260
+            radius: 130
+            bg_opa: 0%
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - lambda: |-
+                  auto now = id(sntp_time).now().timestamp;
+                  float mn = fridge_temp_hist.get_min(now);
+                  float mx = fridge_temp_hist.get_max(now);
+                  char buf[32];
+                  lv_label_set_text(id(minmax_icon_label), "\U000F0290");
+                  lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0x44AADD), 0);
+                  if (std::isnan(mn)) {
+                    lv_label_set_text(id(minmax_min_label), "Min  -- \u00B0C");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Min  %.1f \u00B0C", mn);
+                    lv_label_set_text(id(minmax_min_label), buf);
+                  }
+                  if (std::isnan(mx)) {
+                    lv_label_set_text(id(minmax_max_label), "Max  -- \u00B0C");
+                  } else {
+                    snprintf(buf, sizeof(buf), "Max  %.1f \u00B0C", mx);
+                    lv_label_set_text(id(minmax_max_label), buf);
+                  }
+                  lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
 
 interval:
   - interval: 50ms
@@ -2296,13 +2448,18 @@ interval:
       - lambda: |-
           // Fast poll for touch wake when screen is off
           if (id(screen_state) != 2) return;
+          static uint32_t off_since = 0;
+          if (off_since == 0) off_since = millis();
+          // Ignore touch interrupts for first 10s after screen off (spurious pulses)
+          if (millis() - off_since < 10000) return;
           int gpio4 = gpio_get_level(GPIO_NUM_4);
           if (gpio4 == 0) {
-            ESP_LOGW("screen", "WAKE: GPIO4 LOW while screen off");
+            ESP_LOGW("screen", "WAKE: GPIO4 LOW (off for %lums)", (unsigned long)(millis() - off_since));
             id(backlight).set_level(1.0);
             id(backlight).turn_on();
             id(lvgl_comp)->set_paused(false, false);
             id(screen_state) = 0;
+            off_since = 0;
           }
   - interval: 500ms
     then:
@@ -2418,7 +2575,7 @@ interval:
             lv_obj_set_style_bg_color(id(flow_line_mains), idle, 0);
           }
 
-          // --- Time-to-go display ---
+          // --- Time-to-go / charge status display ---
           if (!std::isnan(ttg) && ttg > 0) {
             int mins = (int)ttg;
             if (mins >= 1440) {
@@ -2432,11 +2589,18 @@ interval:
             } else {
               snprintf(buf, sizeof(buf), "%dm", mins);
             }
-            char ttg_buf[48];
-            snprintf(ttg_buf, sizeof(ttg_buf), "Discharge Time\n%s", buf);
-            lv_label_set_text(id(flow_ttg_label), ttg_buf);
+            lv_label_set_text(id(flow_ttg_title), "Discharging");
+            lv_label_set_text(id(flow_ttg_label), buf);
+            lv_obj_clear_flag(id(flow_ttg_title), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(flow_ttg_label), LV_OBJ_FLAG_HIDDEN);
+          } else if (!std::isnan(shunt_i) && shunt_i > 0) {
+            lv_label_set_text(id(flow_ttg_title), "Charging");
+            snprintf(buf, sizeof(buf), "+%.1f A", shunt_i);
+            lv_label_set_text(id(flow_ttg_label), buf);
+            lv_obj_clear_flag(id(flow_ttg_title), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(flow_ttg_label), LV_OBJ_FLAG_HIDDEN);
           } else {
+            lv_obj_add_flag(id(flow_ttg_title), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(flow_ttg_label), LV_OBJ_FLAG_HIDDEN);
           }
 
@@ -2842,6 +3006,11 @@ sensor:
     temperature:
       id: van_temp
       name: "Van Temperature"
+      on_value:
+        - lambda: |-
+            if (!std::isnan(x)) {
+              van_temp_hist.record(x, id(sntp_time).now().timestamp);
+            }
     humidity:
       id: van_humidity
       name: "Van Humidity"
@@ -2850,6 +3019,11 @@ sensor:
     temperature:
       id: outside_temp
       name: "Outside Temperature"
+      on_value:
+        - lambda: |-
+            if (!std::isnan(x)) {
+              outside_temp_hist.record(x, id(sntp_time).now().timestamp);
+            }
     humidity:
       id: outside_humidity
       name: "Outside Humidity"
@@ -2858,6 +3032,11 @@ sensor:
     temperature:
       id: fridge_temp
       name: "Fridge Temperature"
+      on_value:
+        - lambda: |-
+            if (!std::isnan(x)) {
+              fridge_temp_hist.record(x, id(sntp_time).now().timestamp);
+            }
     humidity:
       id: fridge_humidity
       name: "Fridge Humidity"
