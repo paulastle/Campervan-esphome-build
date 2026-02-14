@@ -4345,6 +4345,21 @@ interval:
           bool shunt_online = (id(shunt_last_ms) != 0 && (now - id(shunt_last_ms)) < 120000);
           bool charger_online = (id(charger_last_ms) != 0 && (now - id(charger_last_ms)) < 120000);
           bool all_offline = !mppt_online && !shunt_online && !charger_online;
+
+          // Read core sensors (NaN if not yet received) — always needed for battery alarm
+          float pv_power = id(mppt_pv_power).state;
+          float mains_power = id(mains_battery_power).state;
+          float shunt_v = id(shunt_voltage).state;
+          float shunt_i = id(shunt_current).state;
+          float soc = id(shunt_soc).state;
+          float mppt_i = id(mppt_battery_current).state;
+          float mains_i = id(mains_battery_current).state;
+          float ttg = id(shunt_ttg).state;
+
+          int page = id(lvgl_comp)->get_current_page();
+
+          // --- Flow page (15) ---
+          if (page == 15) {
           lv_color_t grey = lv_color_hex(0x555555);
 
           // Grey out icons for offline devices
@@ -4368,16 +4383,6 @@ interval:
           } else {
             lv_obj_add_flag(id(flow_no_devices_label), LV_OBJ_FLAG_HIDDEN);
           }
-
-          // Read sensors (NaN if not yet received)
-          float pv_power = id(mppt_pv_power).state;
-          float mains_power = id(mains_battery_power).state;
-          float shunt_v = id(shunt_voltage).state;
-          float shunt_i = id(shunt_current).state;
-          float soc = id(shunt_soc).state;
-          float mppt_i = id(mppt_battery_current).state;
-          float mains_i = id(mains_battery_current).state;
-          float ttg = id(shunt_ttg).state;
 
           // --- Flow page labels (amps) ---
           if (std::isnan(mppt_i)) {
@@ -4493,8 +4498,10 @@ interval:
           } else {
             lv_obj_set_style_bg_color(id(flow_page).obj, lv_color_hex(0x000000), 0);
           }
+          } // end Flow page (15)
 
-          // --- Sub-page arcs + labels (still use power sensors) ---
+          // --- Power sub-pages (4-6) ---
+          if (page >= 4 && page <= 6) {
           // Battery sub-page
           if (!std::isnan(soc)) {
             lv_arc_set_value(id(battery_arc), (int)soc);
@@ -4513,8 +4520,10 @@ interval:
             snprintf(buf, sizeof(buf), "%.0f W", mains_power);
             lv_label_set_text(id(charger_value_label), buf);
           }
+          } // end Power sub-pages (4-6)
 
-          // --- Temperature hub + sub-page updates ---
+          // --- Temperature pages (16-19) ---
+          if (page >= 16 && page <= 19) {
           float vt = id(van_temp).state;
           float vh = id(van_humidity).state;
           float ot = id(outside_temp).state;
@@ -4594,8 +4603,10 @@ interval:
             snprintf(buf, sizeof(buf), "%.0f %%", fh);
             lv_label_set_text(id(fridge_humid_label), buf);
           }
+          } // end Temperature pages (16-19)
 
-          // --- Energy Monitor pages ---
+          // --- Energy Monitor pages (20-34) ---
+          if (page >= 20 && page <= 34) {
           float mppt_bat_power = id(mppt_battery_power).state;
           float yield_today = id(mppt_yield_today).state;
           float consumed_ah = id(shunt_consumed_ah).state;
@@ -4608,6 +4619,7 @@ interval:
           auto mains_error = id(mains_charger_error).state;
 
           // Energy Monitor Hub (20) summary labels
+          if (page == 20) {
           if (std::isnan(pv_power)) {
             lv_label_set_text(id(energy_solar_summary), "-- W");
           } else {
@@ -4626,7 +4638,10 @@ interval:
             snprintf(buf, sizeof(buf), "%.0f W", mains_power);
             lv_label_set_text(id(energy_mains_summary), buf);
           }
+          } // end Energy Hub (20)
 
+          // Solar pages (24-26)
+          if (page >= 24 && page <= 26) {
           // Solar Live (24)
           if (!std::isnan(pv_power)) {
             lv_arc_set_value(id(solar_live_arc), (int)pv_power);
@@ -4687,7 +4702,10 @@ interval:
             snprintf(buf, sizeof(buf), "Yield Today: %.2f kWh", yield_today);
             lv_label_set_text(id(solar_status_yield_label), buf);
           }
+          } // end Solar pages (24-26)
 
+          // Battery pages (27-29)
+          if (page >= 27 && page <= 29) {
           // Battery Live (27)
           if (!std::isnan(soc)) {
             lv_arc_set_value(id(batt_live_arc), (int)soc);
@@ -4763,7 +4781,10 @@ interval:
               lv_label_set_text(id(batt_hist_current_label), buf);
             }
           }
+          } // end Battery pages (27-29)
 
+          // Mains pages (30-32)
+          if (page >= 30 && page <= 32) {
           // Mains Live (30)
           if (!std::isnan(mains_power)) {
             lv_arc_set_value(id(mains_live_arc), (int)mains_power);
@@ -4821,8 +4842,10 @@ interval:
               lv_label_set_text(id(mains_hist_current_label), buf);
             }
           }
+          } // end Mains pages (30-32)
 
           // Energy Balance (34)
+          if (page == 34) {
           if (!std::isnan(yield_today)) {
             snprintf(buf, sizeof(buf), "%.2f kWh", yield_today);
             lv_label_set_text(id(eb_yield_label), buf);
@@ -4855,6 +4878,8 @@ interval:
               lv_label_set_text(id(eb_peak_solar_label), buf);
             }
           }
+          } // end Energy Balance (34)
+          } // end Energy Monitor pages (20-34)
 
           // --- Battery Alarm ---
           int threshold = id(bat_alarm_threshold);
