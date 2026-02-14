@@ -63,7 +63,6 @@ esp32:
   framework:
     sdkconfig_options:
       CONFIG_I2C_SKIP_LEGACY_CONFLICT_CHECK: "y"
-      CONFIG_SENSORLIB_ESP_IDF_NEW_API: "y"
 
 globals:
   - id: screen_state
@@ -134,14 +133,6 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
-  - id: level_cal_x
-    type: float
-    restore_value: yes
-    initial_value: '0.0'
-  - id: level_cal_z
-    type: float
-    restore_value: yes
-    initial_value: '0.0'
   - id: screensaver_start_ms
     type: uint32_t
     restore_value: no
@@ -158,6 +149,10 @@ globals:
     type: int
     restore_value: yes
     initial_value: '10'
+  - id: screensaver_prev_page
+    type: int
+    restore_value: no
+    initial_value: '15'
 
 i2c:
   frequency: 400kHz
@@ -166,11 +161,6 @@ external_components:
   - source: components
   - source: github://Fabian-Schmidt/esphome-victron_ble
     components: [victron_ble]
-  - source:
-      type: local
-      path: components
-    components: [qmi8658]
-
 spd2010_glue:
   id: touch_glue
   width: 412
@@ -1857,23 +1847,22 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 68);
+            lv_obj_set_width(id(dots_container), 50);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(36, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            id(lvgl_comp)->show_page(35, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -2123,7 +2112,7 @@ lvgl:
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(35, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(34, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_down:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       on_swipe_up:
@@ -3764,27 +3753,24 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 68);
+            lv_obj_set_width(id(dots_container), 50);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
-        - lambda: |-
-            lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(34, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(36, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(35, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_up:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -3867,116 +3853,7 @@ lvgl:
                   text_font: mdi48
                   text_color: 0xFFFFFF
 
-    # === Page 34: Spirit Level ===
-    - id: level_page
-      bg_color: 0x000000
-      on_load:
-        - lambda: |-
-            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 68);
-            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
-            id(settings_visible) = true;
-      on_swipe_left:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
-      on_swipe_right:
-        - lambda: |-
-            lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(33, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
-      on_swipe_up:
-        - lambda: |-
-            lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
-      on_swipe_down:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
-      widgets:
-        # Full-screen dish background
-        - obj:
-            id: level_dish
-            align: CENTER
-            width: 390
-            height: 390
-            radius: 195
-            bg_color: 0x111111
-            bg_opa: 100%
-            border_width: 1
-            border_color: 0x333333
-            pad_all: 0
-            widgets:
-              # Horizontal crosshair
-              - obj:
-                  align: CENTER
-                  width: 388
-                  height: 1
-                  bg_color: 0x222222
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              # Vertical crosshair
-              - obj:
-                  align: CENTER
-                  width: 1
-                  height: 388
-                  bg_color: 0x222222
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              # Inner ring (level zone)
-              - obj:
-                  align: CENTER
-                  width: 80
-                  height: 80
-                  radius: 40
-                  bg_opa: 0%
-                  border_width: 1
-                  border_color: 0x333333
-              # Mid ring
-              - obj:
-                  align: CENTER
-                  width: 190
-                  height: 190
-                  radius: 95
-                  bg_opa: 0%
-                  border_width: 1
-                  border_color: 0x282828
-              # Outer ring
-              - obj:
-                  align: CENTER
-                  width: 300
-                  height: 300
-                  radius: 150
-                  bg_opa: 0%
-                  border_width: 1
-                  border_color: 0x222222
-              # Bubble
-              - obj:
-                  id: level_bubble
-                  align: CENTER
-                  width: 40
-                  height: 40
-                  radius: 20
-                  bg_color: 0x00CC66
-                  bg_opa: 100%
-                  border_width: 0
-        # Calibration flash label (hidden, shown briefly on long-press calibrate)
-        - label:
-            id: level_cal_label
-            align: CENTER
-            text: "Calibrated"
-            text_font: roboto24
-            text_color: 0x00CC66
-            hidden: true
-
-    # === Page 35: Energy Balance ===
+    # === Page 34: Energy Balance ===
     - id: energy_balance_page
       bg_color: 0x000000
       on_load:
@@ -4072,24 +3949,23 @@ lvgl:
             text_font: roboto24
             text_color: 0x888888
 
-    # === Page 36: Brightness Settings ===
+    # === Page 35: Brightness Settings ===
     - id: brightness_page
       bg_color: 0x000000
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 68);
+            lv_obj_set_width(id(dots_container), 50);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
         - lambda: |-
@@ -4244,65 +4120,6 @@ lvgl:
                   text_color: 0xFFFFFF
 
 interval:
-  - interval: 200ms
-    then:
-      - lambda: |-
-          // Spirit level bubble update
-          float raw_x = id(accel_x).state;
-          float raw_z = id(accel_z).state;
-          if (std::isnan(raw_x) || std::isnan(raw_z)) return;
-
-          float adj_x = raw_x - id(level_cal_x);
-          float adj_z = raw_z - id(level_cal_z);
-
-          // Convert to degrees
-          float gx = adj_x / 9.81f;
-          float gz = adj_z / 9.81f;
-          if (gx > 1.0f) gx = 1.0f; else if (gx < -1.0f) gx = -1.0f;
-          if (gz > 1.0f) gz = 1.0f; else if (gz < -1.0f) gz = -1.0f;
-          float deg_x = asinf(gx) * 57.2958f;
-          float deg_z = asinf(gz) * 57.2958f;
-
-          // Map to pixels: 35px per degree, clamp to ±175 (dish radius - bubble radius)
-          int px_x = (int)(deg_x * 35.0f);
-          int px_z = (int)(-deg_z * 35.0f);
-          if (px_x > 175) px_x = 175; else if (px_x < -175) px_x = -175;
-          if (px_z > 175) px_z = 175; else if (px_z < -175) px_z = -175;
-
-          lv_obj_align(id(level_bubble), LV_ALIGN_CENTER, px_x, px_z);
-
-          // Colour: green=level, yellow=slight, red=tilted
-          float total = sqrtf(deg_x * deg_x + deg_z * deg_z);
-          if (total < 0.5f) {
-            lv_obj_set_style_bg_color(id(level_bubble), lv_color_hex(0x00CC66), 0);
-          } else if (total < 2.0f) {
-            lv_obj_set_style_bg_color(id(level_bubble), lv_color_hex(0xFFCC00), 0);
-          } else {
-            lv_obj_set_style_bg_color(id(level_bubble), lv_color_hex(0xFF4444), 0);
-          }
-
-          // Long-press calibration (2s hold)
-          static uint32_t press_start = 0;
-          static bool calibrated = false;
-          uint32_t idle = lv_disp_get_inactive_time(NULL);
-          if (idle < 100) {
-            // Touch active
-            if (press_start == 0) { press_start = millis(); calibrated = false; }
-            if (!calibrated && (millis() - press_start) > 2000) {
-              id(level_cal_x) = id(accel_x).state;
-              id(level_cal_z) = id(accel_z).state;
-              ESP_LOGI("level", "Long-press calibrated: x=%.3f z=%.3f", id(level_cal_x), id(level_cal_z));
-              lv_obj_clear_flag(id(level_cal_label), LV_OBJ_FLAG_HIDDEN);
-              calibrated = true;
-            }
-          } else {
-            press_start = 0;
-            if (calibrated) {
-              lv_obj_add_flag(id(level_cal_label), LV_OBJ_FLAG_HIDDEN);
-              calibrated = false;
-            }
-          }
-
   - interval: 50ms
     then:
       - lambda: |-
@@ -4338,15 +4155,20 @@ interval:
               }
             }
             // Single-tap timeout: wake from screensaver after 500ms
-            if (state == 2 && tap_ms > 0 && (now_ms - tap_ms) > 500) {
-              ESP_LOGI("screen", "SCREENSAVER TAP → WAKE");
-              if (id(screensaver_mode) == 1) {
+            // Only accept taps that occurred after screensaver started
+            if (state == 2 && tap_ms > id(screensaver_start_ms) && (now_ms - tap_ms) > 500) {
+              int mode = id(screensaver_mode);
+              ESP_LOGI("screen", "SCREENSAVER TAP → WAKE (mode=%d)", mode);
+              if (mode == 1) {
                 lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+              } else if (mode == 2) {
+                id(lvgl_comp)->show_page(id(screensaver_prev_page), LV_SCR_LOAD_ANIM_NONE, 0);
               }
               id(backlight).set_level(id(screen_brightness_pct) / 100.0f);
               id(backlight).turn_on();
               id(screen_state) = 0;
               tap_ms = 0;
+              lv_disp_trig_activity(NULL);
             }
             prev_idle = idle;
           }
@@ -4421,6 +4243,7 @@ interval:
             } else {
               // Flow: navigate to flow page at screensaver brightness
               ESP_LOGI("screen", "SCREENSAVER (flow): idle=%ums off_timeout=%ds", idle_ms, off_s);
+              id(screensaver_prev_page) = id(lvgl_comp)->get_current_page();
               id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_NONE, 0);
               id(backlight).set_level(id(saver_brightness_pct) / 100.0f);
               id(screen_state) = 2;
@@ -4572,10 +4395,22 @@ interval:
             lv_label_set_text(id(flow_ttg_label), buf);
             lv_obj_clear_flag(id(flow_ttg_title), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(flow_ttg_label), LV_OBJ_FLAG_HIDDEN);
-          } else if (!std::isnan(shunt_i) && shunt_i > 0) {
-            lv_label_set_text(id(flow_ttg_title), "Charging");
-            snprintf(buf, sizeof(buf), "+%.1f A", shunt_i);
-            lv_label_set_text(id(flow_ttg_label), buf);
+          } else if (!std::isnan(shunt_i) && shunt_i > 0.1f) {
+            float cah = id(shunt_consumed_ah).state;
+            if (!std::isnan(cah) && cah > 0) {
+              int mins = (int)(cah / shunt_i * 60.0f);
+              if (mins >= 60) {
+                snprintf(buf, sizeof(buf), "%dh %dm", mins / 60, mins % 60);
+              } else {
+                snprintf(buf, sizeof(buf), "%dm", mins);
+              }
+              lv_label_set_text(id(flow_ttg_title), "Full in");
+              lv_label_set_text(id(flow_ttg_label), buf);
+            } else {
+              lv_label_set_text(id(flow_ttg_title), "Charging");
+              snprintf(buf, sizeof(buf), "+%.1f A", shunt_i);
+              lv_label_set_text(id(flow_ttg_label), buf);
+            }
             lv_obj_clear_flag(id(flow_ttg_title), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(flow_ttg_label), LV_OBJ_FLAG_HIDDEN);
           } else {
@@ -4824,8 +4659,19 @@ interval:
               snprintf(buf, sizeof(buf), "TTG: %dm", mins);
             }
             lv_label_set_text(id(batt_detail_ttg_label), buf);
-          } else if (!std::isnan(shunt_i) && shunt_i > 0) {
-            lv_label_set_text(id(batt_detail_ttg_label), "Charging");
+          } else if (!std::isnan(shunt_i) && shunt_i > 0.1f) {
+            float cah = id(shunt_consumed_ah).state;
+            if (!std::isnan(cah) && cah > 0) {
+              int mins = (int)(cah / shunt_i * 60.0f);
+              if (mins >= 60) {
+                snprintf(buf, sizeof(buf), "Full: %dh %dm", mins / 60, mins % 60);
+              } else {
+                snprintf(buf, sizeof(buf), "Full: %dm", mins);
+              }
+              lv_label_set_text(id(batt_detail_ttg_label), buf);
+            } else {
+              lv_label_set_text(id(batt_detail_ttg_label), "Charging");
+            }
           }
 
           // Battery History (29)
@@ -4909,7 +4755,7 @@ interval:
             }
           }
 
-          // Energy Balance (35)
+          // Energy Balance (34)
           if (!std::isnan(yield_today)) {
             snprintf(buf, sizeof(buf), "%.2f kWh", yield_today);
             lv_label_set_text(id(eb_yield_label), buf);
@@ -4953,8 +4799,12 @@ interval:
               id(bat_alarm_start_ms) = now;
               // Wake screen if off/dimmed/screensaver
               if (id(screen_state) != 0) {
-                if (id(screen_state) == 2 && id(screensaver_mode) == 1) {
-                  lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+                if (id(screen_state) == 2) {
+                  if (id(screensaver_mode) == 1) {
+                    lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+                  } else if (id(screensaver_mode) == 2) {
+                    id(lvgl_comp)->show_page(id(screensaver_prev_page), LV_SCR_LOAD_ANIM_NONE, 0);
+                  }
                 }
                 id(backlight).set_level(id(screen_brightness_pct) / 100.0f);
                 id(backlight).turn_on();
@@ -5356,30 +5206,3 @@ sensor:
     humidity:
       id: fridge_humidity
       name: "Fridge Humidity"
-
-  # --- QMI8658 IMU (spirit level) ---
-  - platform: qmi8658
-    address: 0x6B
-    acceleration_x:
-      id: accel_x
-      internal: true
-      filters:
-        - exponential_moving_average:
-            alpha: 0.5
-            send_every: 1
-    acceleration_y:
-      id: accel_y
-      internal: true
-    acceleration_z:
-      id: accel_z
-      internal: true
-      filters:
-        - exponential_moving_average:
-            alpha: 0.5
-            send_every: 1
-    temperature:
-      id: imu_temp
-      internal: true
-    update_interval: 200ms
-    acceleration_range: "2G"
-    acceleration_odr: "125hz"
