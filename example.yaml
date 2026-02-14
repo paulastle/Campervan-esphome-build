@@ -38,11 +38,32 @@ esphome:
                 break;
               }
             }
+            const char* alarm_labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %"};
+            int alarm_vals[] = {0, 10, 15, 20, 25, 30};
+            for (int i = 0; i < 6; i++) {
+              if (alarm_vals[i] == id(bat_alarm_threshold)) {
+                lv_label_set_text(id(alarm_value_label),alarm_labels[i]);
+                break;
+              }
+            }
+            const char* saver_labels[] = {"Off", "Clock", "Flow"};
+            lv_label_set_text(id(saver_value_label), saver_labels[id(screensaver_mode)]);
+            char bbuf[8];
+            snprintf(bbuf, sizeof(bbuf), "%d %%", id(screen_brightness_pct));
+            lv_label_set_text(id(screen_bright_label), bbuf);
+            snprintf(bbuf, sizeof(bbuf), "%d %%", id(saver_brightness_pct));
+            lv_label_set_text(id(saver_bright_label), bbuf);
             // Boot to Flow page instead of Splash
             id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_NONE, 0);
 
 packages:
   waveshare_display: github://gjdodd/esphome-packages/waveshare-esp32-s3-touch-lcd-146b.yaml@main
+
+esp32:
+  framework:
+    sdkconfig_options:
+      CONFIG_I2C_SKIP_LEGACY_CONFLICT_CHECK: "y"
+      CONFIG_SENSORLIB_ESP_IDF_NEW_API: "y"
 
 globals:
   - id: screen_state
@@ -97,6 +118,46 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
+  - id: bat_alarm_threshold
+    type: int
+    restore_value: yes
+    initial_value: '20'
+  - id: bat_alarm_armed
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+  - id: bat_alarm_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: bat_alarm_start_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: level_cal_x
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: level_cal_z
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: screensaver_start_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: screensaver_mode
+    type: int
+    restore_value: yes
+    initial_value: '1'
+  - id: screen_brightness_pct
+    type: int
+    restore_value: yes
+    initial_value: '100'
+  - id: saver_brightness_pct
+    type: int
+    restore_value: yes
+    initial_value: '10'
 
 i2c:
   frequency: 400kHz
@@ -105,6 +166,10 @@ external_components:
   - source: components
   - source: github://Fabian-Schmidt/esphome-victron_ble
     components: [victron_ble]
+  - source:
+      type: local
+      path: components
+    components: [qmi8658]
 
 spd2010_glue:
   id: touch_glue
@@ -218,6 +283,7 @@ font:
       - "\U000F0046"  # mdi-alarm
       - "\U000F0AB1"  # mdi-chip
       - "\U000F00ED"  # mdi-clock-outline
+      - "\U000F0709"  # mdi-restart
       - "\U000F00A1"  # mdi-bluetooth-connect
       - "\U000F0317"  # mdi-lan (ping)
       - "\U000F01E7"  # mdi-earth (DNS)
@@ -547,6 +613,100 @@ lvgl:
                       text: "OK"
                       text_font: roboto32
                       text_color: 0xFFFFFF
+      - obj:
+          id: bat_alarm_popup
+          align: CENTER
+          width: 412
+          height: 412
+          bg_color: 0x000000
+          bg_opa: 90%
+          border_width: 0
+          radius: 206
+          pad_all: 0
+          opa: LV_OPA_COVER
+          hidden: true
+          widgets:
+            - label:
+                align: CENTER
+                y: -100
+                text: "\U000F0046"
+                text_font: mdi48
+                text_color: 0xFF4444
+            - label:
+                align: CENTER
+                y: -55
+                text: "Low Battery"
+                text_font: roboto32
+                text_color: 0xFFFFFF
+            - label:
+                id: bat_alarm_soc_label
+                align: CENTER
+                y: -10
+                text: ""
+                text_font: roboto48
+                text_color: 0xFF6644
+            - button:
+                align: CENTER
+                y: 110
+                width: 80
+                height: 80
+                radius: 40
+                bg_color: 0xCC2222
+                border_width: 0
+                pad_all: 0
+                on_click:
+                  - lambda: |-
+                      id(bat_alarm_active) = false;
+                      id(rtttl_player)->stop();
+                      lv_obj_add_flag(id(bat_alarm_popup), LV_OBJ_FLAG_HIDDEN);
+                widgets:
+                  - label:
+                      align: CENTER
+                      text: "OK"
+                      text_font: roboto32
+                      text_color: 0xFFFFFF
+            - label:
+                align: CENTER
+                y: 175
+                text: "Dismiss"
+                text_font: roboto24
+                text_color: 0xCCCCCC
+      - obj:
+          id: clock_screensaver
+          align: CENTER
+          width: 412
+          height: 412
+          bg_color: 0x000000
+          bg_opa: 100%
+          border_width: 0
+          radius: 206
+          pad_all: 0
+          hidden: true
+          widgets:
+            # Big digital time
+            - label:
+                id: ss_time_label
+                align: CENTER
+                y: -20
+                text: "--:--"
+                text_font: roboto96
+                text_color: 0x888888
+            # Date
+            - label:
+                id: ss_date_label
+                align: CENTER
+                y: 55
+                text: ""
+                text_font: roboto24
+                text_color: 0x444444
+            # SOC readout
+            - label:
+                id: ss_soc_label
+                align: CENTER
+                y: 90
+                text: ""
+                text_font: roboto32
+                text_color: 0x224422
   pages:
     # === Page 0: Splash ===
     - id: splash_page
@@ -554,20 +714,21 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0xFFFFFF), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
@@ -655,20 +816,21 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -711,20 +873,21 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -1497,8 +1660,8 @@ lvgl:
             text_font: roboto24
             text_color: 0xFF4444
 
-    # === Page 12: Clock (System sub) ===
-    - id: clock_page
+    # === Page 12: Reboot (System sub) ===
+    - id: reboot_page
       bg_color: 0x000000
       on_load:
         - lambda: |-
@@ -1534,27 +1697,27 @@ lvgl:
       on_swipe_down:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
-        - label:
-            id: clock_time_label
+        - button:
             align: CENTER
-            y: -30
-            text: "--:--"
-            text_font: roboto96
-            text_color: 0xFFFFFF
-        - label:
-            id: clock_seconds_label
-            align: CENTER
-            y: 40
-            text: ":--"
-            text_font: roboto48
-            text_color: 0x888888
-        - label:
-            id: clock_date_label
-            align: CENTER
-            y: 100
-            text: "-- --- ----"
-            text_font: roboto32
-            text_color: 0x888888
+            width: 160
+            height: 160
+            radius: 80
+            bg_color: 0x333333
+            on_click:
+              - button.press: restart_button
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -15
+                  text: "\U000F0709"
+                  text_font: mdi48
+                  text_color: 0xFF6644
+              - label:
+                  align: CENTER
+                  y: 30
+                  text: "Reboot"
+                  text_font: roboto24
+                  text_color: 0xFFFFFF
 
     # === Page 13: Sound Test (System sub) ===
     - id: sound_page
@@ -1693,10 +1856,24 @@ lvgl:
       bg_color: 0x000000
       on_load:
         - lambda: |-
-            lv_obj_add_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 68);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(36, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -1708,16 +1885,10 @@ lvgl:
       on_swipe_down:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
-        - label:
-            align: CENTER
-            y: -100
-            text: "Settings"
-            text_font: roboto32
-            text_color: 0xFFFFFF
         # Screen Dim row
         - label:
             align: CENTER
-            y: -40
+            y: -125
             text: "Screen Dim"
             text_font: roboto24
             text_color: 0xCCCCCC
@@ -1725,7 +1896,7 @@ lvgl:
         - button:
             align: CENTER
             x: -90
-            y: 15
+            y: -80
             width: 64
             height: 64
             radius: 32
@@ -1752,7 +1923,7 @@ lvgl:
         - label:
             id: dim_value_label
             align: CENTER
-            y: 15
+            y: -80
             text: "30 sec"
             text_font: roboto24
             text_color: 0xFFFFFF
@@ -1760,7 +1931,7 @@ lvgl:
         - button:
             align: CENTER
             x: 90
-            y: 15
+            y: -80
             width: 64
             height: 64
             radius: 32
@@ -1786,7 +1957,7 @@ lvgl:
         # Screen Off row
         - label:
             align: CENTER
-            y: 70
+            y: -35
             text: "Screen Off"
             text_font: roboto24
             text_color: 0xCCCCCC
@@ -1794,7 +1965,7 @@ lvgl:
         - button:
             align: CENTER
             x: -90
-            y: 115
+            y: 10
             width: 64
             height: 64
             radius: 32
@@ -1821,7 +1992,7 @@ lvgl:
         - label:
             id: off_value_label
             align: CENTER
-            y: 115
+            y: 10
             text: "1 min"
             text_font: roboto24
             text_color: 0xFFFFFF
@@ -1829,7 +2000,7 @@ lvgl:
         - button:
             align: CENTER
             x: 90
-            y: 115
+            y: 10
             width: 64
             height: 64
             radius: 32
@@ -1852,6 +2023,75 @@ lvgl:
                   text: "\U000F0142"
                   text_font: mdi48
                   text_color: 0xFFFFFF
+        # Screen Saver row
+        - label:
+            align: CENTER
+            y: 55
+            text: "Screen Saver"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        # Saver stepper: left arrow
+        - button:
+            align: CENTER
+            x: -90
+            y: 100
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 1, 2};
+                  const char* labels[] = {"Off", "Clock", "Flow"};
+                  int current = id(screensaver_mode);
+                  int idx = 0;
+                  for (int i = 0; i < 3; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx - 1 + 3) % 3;
+                  id(screensaver_mode) = vals[idx];
+                  lv_label_set_text(id(saver_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Saver stepper: value label
+        - label:
+            id: saver_value_label
+            align: CENTER
+            y: 100
+            text: "Clock"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Saver stepper: right arrow
+        - button:
+            align: CENTER
+            x: 90
+            y: 100
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 1, 2};
+                  const char* labels[] = {"Off", "Clock", "Flow"};
+                  int current = id(screensaver_mode);
+                  int idx = 0;
+                  for (int i = 0; i < 3; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx + 1) % 3;
+                  id(screensaver_mode) = vals[idx];
+                  lv_label_set_text(id(saver_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
 
     # === Page 15: Power Flow ===
     - id: flow_page
@@ -1859,27 +2099,31 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
+            lv_obj_add_flag(id(flow_no_devices_label), LV_OBJ_FLAG_HIDDEN);
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
             id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(35, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_down:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       on_swipe_up:
@@ -1887,6 +2131,7 @@ lvgl:
       widgets:
         # --- Solar icon (top center) ---
         - label:
+            id: flow_solar_icon
             align: TOP_MID
             y: 60
             text: "\U000F0A72"
@@ -1940,6 +2185,7 @@ lvgl:
             radius: 2
         # --- Van icon (left) ---
         - label:
+            id: flow_van_icon
             align: CENTER
             x: -130
             y: 0
@@ -1968,6 +2214,7 @@ lvgl:
             radius: 2
         # --- Mains icon (right) ---
         - label:
+            id: flow_mains_icon
             align: CENTER
             x: 130
             y: 0
@@ -2001,6 +2248,15 @@ lvgl:
             text_align: CENTER
             text_font: roboto32
             text_color: 0xAAAAAA
+        # --- No Connected Devices label (shown when all 3 BLE devices offline) ---
+        - label:
+            id: flow_no_devices_label
+            align: CENTER
+            y: 120
+            text: "No Connected\nDevices"
+            text_align: CENTER
+            text_font: roboto24
+            text_color: 0xFF4444
 
     # === Page 16: Temperature Hub ===
     - id: temp_hub_page
@@ -2008,20 +2264,21 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -2464,20 +2721,21 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 100);
+            lv_obj_set_width(id(dots_container), 118);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -3500,63 +3758,718 @@ lvgl:
             text_font: roboto28
             text_color: 0x00CCCC
 
+    # === Page 33: Battery Alarm Settings ===
+    - id: bat_alarm_settings_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 68);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            id(settings_visible) = true;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(34, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(36, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: CENTER
+            y: -100
+            text: "Battery Alarm"
+            text_font: roboto32
+            text_color: 0xFFFFFF
+        - label:
+            align: CENTER
+            y: -40
+            text: "SOC Threshold"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        # Alarm threshold stepper: left arrow
+        - button:
+            align: CENTER
+            x: -90
+            y: 15
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 10, 15, 20, 25, 30};
+                  const char* labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %"};
+                  int current = id(bat_alarm_threshold);
+                  int idx = 0;
+                  for (int i = 0; i < 6; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx - 1 + 6) % 6;
+                  id(bat_alarm_threshold) = vals[idx];
+                  lv_label_set_text(id(alarm_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Alarm threshold stepper: value label
+        - label:
+            id: alarm_value_label
+            align: CENTER
+            y: 15
+            text: "20 %"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Alarm threshold stepper: right arrow
+        - button:
+            align: CENTER
+            x: 90
+            y: 15
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 10, 15, 20, 25, 30};
+                  const char* labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %"};
+                  int current = id(bat_alarm_threshold);
+                  int idx = 0;
+                  for (int i = 0; i < 6; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx + 1) % 6;
+                  id(bat_alarm_threshold) = vals[idx];
+                  lv_label_set_text(id(alarm_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+
+    # === Page 34: Spirit Level ===
+    - id: level_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 68);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = true;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(33, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        # Full-screen dish background
+        - obj:
+            id: level_dish
+            align: CENTER
+            width: 390
+            height: 390
+            radius: 195
+            bg_color: 0x111111
+            bg_opa: 100%
+            border_width: 1
+            border_color: 0x333333
+            pad_all: 0
+            widgets:
+              # Horizontal crosshair
+              - obj:
+                  align: CENTER
+                  width: 388
+                  height: 1
+                  bg_color: 0x222222
+                  bg_opa: 100%
+                  border_width: 0
+                  radius: 0
+              # Vertical crosshair
+              - obj:
+                  align: CENTER
+                  width: 1
+                  height: 388
+                  bg_color: 0x222222
+                  bg_opa: 100%
+                  border_width: 0
+                  radius: 0
+              # Inner ring (level zone)
+              - obj:
+                  align: CENTER
+                  width: 80
+                  height: 80
+                  radius: 40
+                  bg_opa: 0%
+                  border_width: 1
+                  border_color: 0x333333
+              # Mid ring
+              - obj:
+                  align: CENTER
+                  width: 190
+                  height: 190
+                  radius: 95
+                  bg_opa: 0%
+                  border_width: 1
+                  border_color: 0x282828
+              # Outer ring
+              - obj:
+                  align: CENTER
+                  width: 300
+                  height: 300
+                  radius: 150
+                  bg_opa: 0%
+                  border_width: 1
+                  border_color: 0x222222
+              # Bubble
+              - obj:
+                  id: level_bubble
+                  align: CENTER
+                  width: 40
+                  height: 40
+                  radius: 20
+                  bg_color: 0x00CC66
+                  bg_opa: 100%
+                  border_width: 0
+        # Calibration flash label (hidden, shown briefly on long-press calibrate)
+        - label:
+            id: level_cal_label
+            align: CENTER
+            text: "Calibrated"
+            text_font: roboto24
+            text_color: 0x00CC66
+            hidden: true
+
+    # === Page 35: Energy Balance ===
+    - id: energy_balance_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_up:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 35
+            text: "Energy Balance"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        # Solar icon + yield
+        - label:
+            align: CENTER
+            x: -70
+            y: -75
+            text: "\U000F0A72"
+            text_font: mdi48
+            text_color: 0xFFCC00
+        - label:
+            id: eb_yield_label
+            align: CENTER
+            x: 30
+            y: -75
+            text: "-- kWh"
+            text_font: roboto32
+            text_color: 0xFFCC00
+        # SOC (large, centered)
+        - label:
+            id: eb_soc_label
+            align: CENTER
+            y: -15
+            text: "-- %"
+            text_font: roboto48
+            text_color: 0x00CC66
+        # Net current
+        - label:
+            id: eb_current_label
+            align: CENTER
+            y: 35
+            text: "-- A"
+            text_font: roboto32
+            text_color: 0x00CC66
+        # Consumed Ah
+        - label:
+            id: eb_consumed_label
+            align: CENTER
+            y: 75
+            text: "-- Ah consumed"
+            text_font: roboto24
+            text_color: 0x888888
+        # SOC range (24h)
+        - label:
+            id: eb_soc_range_label
+            align: CENTER
+            y: 105
+            text: "SOC: --"
+            text_font: roboto24
+            text_color: 0x888888
+        # Peak solar (24h)
+        - label:
+            id: eb_peak_solar_label
+            align: CENTER
+            y: 135
+            text: "Peak: --"
+            text_font: roboto24
+            text_color: 0x888888
+
+    # === Page 36: Brightness Settings ===
+    - id: brightness_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 68);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            id(settings_visible) = true;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(33, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(14, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        # Screen Brightness row
+        - label:
+            align: CENTER
+            y: -90
+            text: "Screen"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: -45
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(screen_brightness_pct) - 10;
+                  if (v < 10) v = 100;
+                  id(screen_brightness_pct) = v;
+                  char buf[8];
+                  snprintf(buf, sizeof(buf), "%d %%", v);
+                  lv_label_set_text(id(screen_bright_label), buf);
+                  if (id(screen_state) == 0) {
+                    id(backlight).set_level(v / 100.0f);
+                  }
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: screen_bright_label
+            align: CENTER
+            y: -45
+            text: "100 %"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: -45
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(screen_brightness_pct) + 10;
+                  if (v > 100) v = 10;
+                  id(screen_brightness_pct) = v;
+                  char buf[8];
+                  snprintf(buf, sizeof(buf), "%d %%", v);
+                  lv_label_set_text(id(screen_bright_label), buf);
+                  if (id(screen_state) == 0) {
+                    id(backlight).set_level(v / 100.0f);
+                  }
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Saver Brightness row
+        - label:
+            align: CENTER
+            y: 0
+            text: "Saver"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: 45
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(saver_brightness_pct) - 10;
+                  if (v < 10) v = 100;
+                  id(saver_brightness_pct) = v;
+                  char buf[8];
+                  snprintf(buf, sizeof(buf), "%d %%", v);
+                  lv_label_set_text(id(saver_bright_label), buf);
+                  if (id(screen_state) == 2) {
+                    id(backlight).set_level(v / 100.0f);
+                  }
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: saver_bright_label
+            align: CENTER
+            y: 45
+            text: "10 %"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: 45
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(saver_brightness_pct) + 10;
+                  if (v > 100) v = 10;
+                  id(saver_brightness_pct) = v;
+                  char buf[8];
+                  snprintf(buf, sizeof(buf), "%d %%", v);
+                  lv_label_set_text(id(saver_bright_label), buf);
+                  if (id(screen_state) == 2) {
+                    id(backlight).set_level(v / 100.0f);
+                  }
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+
 interval:
+  - interval: 200ms
+    then:
+      - lambda: |-
+          // Spirit level bubble update
+          float raw_x = id(accel_x).state;
+          float raw_z = id(accel_z).state;
+          if (std::isnan(raw_x) || std::isnan(raw_z)) return;
+
+          float adj_x = raw_x - id(level_cal_x);
+          float adj_z = raw_z - id(level_cal_z);
+
+          // Convert to degrees
+          float gx = adj_x / 9.81f;
+          float gz = adj_z / 9.81f;
+          if (gx > 1.0f) gx = 1.0f; else if (gx < -1.0f) gx = -1.0f;
+          if (gz > 1.0f) gz = 1.0f; else if (gz < -1.0f) gz = -1.0f;
+          float deg_x = asinf(gx) * 57.2958f;
+          float deg_z = asinf(gz) * 57.2958f;
+
+          // Map to pixels: 35px per degree, clamp to ±175 (dish radius - bubble radius)
+          int px_x = (int)(deg_x * 35.0f);
+          int px_z = (int)(-deg_z * 35.0f);
+          if (px_x > 175) px_x = 175; else if (px_x < -175) px_x = -175;
+          if (px_z > 175) px_z = 175; else if (px_z < -175) px_z = -175;
+
+          lv_obj_align(id(level_bubble), LV_ALIGN_CENTER, px_x, px_z);
+
+          // Colour: green=level, yellow=slight, red=tilted
+          float total = sqrtf(deg_x * deg_x + deg_z * deg_z);
+          if (total < 0.5f) {
+            lv_obj_set_style_bg_color(id(level_bubble), lv_color_hex(0x00CC66), 0);
+          } else if (total < 2.0f) {
+            lv_obj_set_style_bg_color(id(level_bubble), lv_color_hex(0xFFCC00), 0);
+          } else {
+            lv_obj_set_style_bg_color(id(level_bubble), lv_color_hex(0xFF4444), 0);
+          }
+
+          // Long-press calibration (2s hold)
+          static uint32_t press_start = 0;
+          static bool calibrated = false;
+          uint32_t idle = lv_disp_get_inactive_time(NULL);
+          if (idle < 100) {
+            // Touch active
+            if (press_start == 0) { press_start = millis(); calibrated = false; }
+            if (!calibrated && (millis() - press_start) > 2000) {
+              id(level_cal_x) = id(accel_x).state;
+              id(level_cal_z) = id(accel_z).state;
+              ESP_LOGI("level", "Long-press calibrated: x=%.3f z=%.3f", id(level_cal_x), id(level_cal_z));
+              lv_obj_clear_flag(id(level_cal_label), LV_OBJ_FLAG_HIDDEN);
+              calibrated = true;
+            }
+          } else {
+            press_start = 0;
+            if (calibrated) {
+              lv_obj_add_flag(id(level_cal_label), LV_OBJ_FLAG_HIDDEN);
+              calibrated = false;
+            }
+          }
+
   - interval: 50ms
     then:
       - lambda: |-
-          // Fast poll for touch wake when screen is off
-          if (id(screen_state) != 2) return;
-          static uint32_t off_since = 0;
-          if (off_since == 0) off_since = millis();
-          // Ignore touch interrupts for first 10s after screen off (spurious pulses)
-          if (millis() - off_since < 10000) return;
-          int gpio4 = gpio_get_level(GPIO_NUM_4);
-          if (gpio4 == 0) {
-            ESP_LOGW("screen", "WAKE: GPIO4 LOW (off for %lums)", (unsigned long)(millis() - off_since));
-            id(backlight).set_level(1.0);
-            id(backlight).turn_on();
-            id(lvgl_comp)->set_paused(false, false);
-            id(screen_state) = 0;
-            off_since = 0;
+          static uint32_t prev_idle = 0, tap_ms = 0, off_since = 0;
+          int state = id(screen_state);
+          uint32_t now_ms = millis();
+
+          // Reset off_since when not in OFF state
+          if (state != 3) off_since = 0;
+
+          // Skip double-tap detection during first 5s after boot
+          if (now_ms < 5000) { prev_idle = lv_disp_get_inactive_time(NULL); return; }
+
+          // Double-tap detection (ON or SCREENSAVER states, not on settings pages)
+          if ((state == 0 || state == 2) && !id(settings_visible)) {
+            uint32_t idle = lv_disp_get_inactive_time(NULL);
+            if (prev_idle > 200 && idle < 50) {
+              // New touch detected
+              if (tap_ms > 0 && (now_ms - tap_ms) > 100 && (now_ms - tap_ms) < 500) {
+                // DOUBLE-TAP → OFF
+                ESP_LOGI("screen", "DOUBLE-TAP → OFF from state %d", state);
+                if (state == 2 && id(screensaver_mode) == 1) {
+                  lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+                }
+                id(backlight).set_level(0.0);
+                id(backlight).turn_off();
+                id(lvgl_comp)->set_paused(true, false);
+                id(screen_state) = 3;
+                tap_ms = 0;
+              } else {
+                tap_ms = now_ms;
+              }
+            }
+            // Single-tap timeout: wake from screensaver after 500ms
+            if (state == 2 && tap_ms > 0 && (now_ms - tap_ms) > 500) {
+              ESP_LOGI("screen", "SCREENSAVER TAP → WAKE");
+              if (id(screensaver_mode) == 1) {
+                lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+              }
+              id(backlight).set_level(id(screen_brightness_pct) / 100.0f);
+              id(backlight).turn_on();
+              id(screen_state) = 0;
+              tap_ms = 0;
+            }
+            prev_idle = idle;
+          }
+
+          // GPIO4 wake (OFF state only)
+          if (state == 3) {
+            if (off_since == 0) off_since = now_ms;
+            // Ignore touch interrupts for first 10s after screen off
+            if (now_ms - off_since < 10000) return;
+            int gpio4 = gpio_get_level(GPIO_NUM_4);
+            if (gpio4 == 0) {
+              ESP_LOGW("screen", "WAKE: GPIO4 LOW (off for %lums)", (unsigned long)(now_ms - off_since));
+              id(backlight).set_level(id(screen_brightness_pct) / 100.0f);
+              id(backlight).turn_on();
+              id(lvgl_comp)->set_paused(false, false);
+              id(screen_state) = 0;
+              off_since = 0;
+            }
           }
   - interval: 500ms
     then:
       - lambda: |-
           int state = id(screen_state);
-          if (state == 2) return;  // Wake handled by fast poll
-          {
-            uint32_t idle_ms = lv_disp_get_inactive_time(NULL);
-            int dim_s = id(dim_timeout_sec);
-            int off_s = id(off_timeout_sec);
-            bool settings_open = id(settings_visible);
+          if (state >= 3) return;  // OFF: handled by 50ms GPIO poll
 
-            if (settings_open) {
-              // Don't timeout while settings page is open
-              return;
-            }
+          if (id(settings_visible) || id(bat_alarm_active)) return;
 
-            if (off_s > 0 && idle_ms >= (uint32_t)(off_s * 1000)) {
-              ESP_LOGI("screen", "OFF: idle=%ums off_timeout=%ds", idle_ms, off_s);
+          uint32_t idle_ms = lv_disp_get_inactive_time(NULL);
+          int dim_s = id(dim_timeout_sec);
+          int off_s = id(off_timeout_sec);
+
+          // SCREENSAVER active: auto-off after 5 minutes
+          if (state == 2) {
+            uint32_t elapsed = millis() - id(screensaver_start_ms);
+            if (elapsed > 300000) {
+              ESP_LOGI("screen", "SCREENSAVER → OFF (5min timeout)");
+              if (id(screensaver_mode) == 1) {
+                lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+              }
               id(backlight).set_level(0.0);
               id(backlight).turn_off();
               id(lvgl_comp)->set_paused(true, false);
-              id(screen_state) = 2;
-            } else if (dim_s > 0 && idle_ms >= (uint32_t)(dim_s * 1000) && state == 0) {
-              ESP_LOGI("screen", "DIM: idle=%ums dim_timeout=%ds", idle_ms, dim_s);
-              id(backlight).set_level(0.15);
-              id(screen_state) = 1;
-            } else if (state == 1 && dim_s > 0 && idle_ms < (uint32_t)(dim_s * 1000)) {
-              ESP_LOGI("screen", "UNDIM: idle=%ums (touch while dimmed)", idle_ms);
-              id(backlight).set_level(1.0);
-              id(screen_state) = 0;
+              id(screen_state) = 3;
             }
-          }  // end block
+            return;
+          }
+
+          // ON/DIM → SCREENSAVER (when off timeout reached)
+          if (off_s > 0 && idle_ms >= (uint32_t)(off_s * 1000) && state < 2) {
+            int mode = id(screensaver_mode);
+            if (mode == 0) {
+              // Off: skip screensaver, go straight to OFF
+              ESP_LOGI("screen", "IDLE → OFF (screensaver disabled)");
+              id(backlight).set_level(0.0);
+              id(backlight).turn_off();
+              id(lvgl_comp)->set_paused(true, false);
+              id(screen_state) = 3;
+            } else if (mode == 1) {
+              // Clock: existing behavior
+              ESP_LOGI("screen", "SCREENSAVER (clock): idle=%ums off_timeout=%ds", idle_ms, off_s);
+              lv_obj_clear_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+              id(backlight).set_level(id(saver_brightness_pct) / 100.0f);
+              id(screen_state) = 2;
+              id(screensaver_start_ms) = millis();
+            } else {
+              // Flow: navigate to flow page at screensaver brightness
+              ESP_LOGI("screen", "SCREENSAVER (flow): idle=%ums off_timeout=%ds", idle_ms, off_s);
+              id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_NONE, 0);
+              id(backlight).set_level(id(saver_brightness_pct) / 100.0f);
+              id(screen_state) = 2;
+              id(screensaver_start_ms) = millis();
+            }
+            return;
+          }
+
+          // ON → DIM
+          if (dim_s > 0 && idle_ms >= (uint32_t)(dim_s * 1000) && state == 0) {
+            ESP_LOGI("screen", "DIM: idle=%ums dim_timeout=%ds", idle_ms, dim_s);
+            id(backlight).set_level(0.15);
+            id(screen_state) = 1;
+          }
+
+          // DIM → ON (touch while dimmed)
+          if (state == 1 && dim_s > 0 && idle_ms < (uint32_t)(dim_s * 1000)) {
+            ESP_LOGI("screen", "UNDIM: idle=%ums (touch while dimmed)", idle_ms);
+            id(backlight).set_level(id(screen_brightness_pct) / 100.0f);
+            id(screen_state) = 0;
+          }
 
   - interval: 2s
     then:
       - lambda: |-
           // --- Power Flow page + sub-page updates ---
           char buf[32];
+
+          // --- Offline detection (120s threshold) ---
+          uint32_t now = millis();
+          bool mppt_online = (id(mppt_last_ms) != 0 && (now - id(mppt_last_ms)) < 120000);
+          bool shunt_online = (id(shunt_last_ms) != 0 && (now - id(shunt_last_ms)) < 120000);
+          bool charger_online = (id(charger_last_ms) != 0 && (now - id(charger_last_ms)) < 120000);
+          bool all_offline = !mppt_online && !shunt_online && !charger_online;
+          lv_color_t grey = lv_color_hex(0x555555);
+
+          // Grey out icons for offline devices
+          lv_obj_set_style_text_color(id(flow_solar_icon), mppt_online ? lv_color_hex(0xFFCC00) : grey, 0);
+          lv_obj_set_style_text_color(id(flow_battery_icon), shunt_online ? lv_color_hex(0x00CC66) : grey, 0);
+          lv_obj_set_style_text_color(id(flow_mains_icon), charger_online ? lv_color_hex(0x00CCCC) : grey, 0);
+
+          // Grey out labels for offline devices
+          lv_obj_set_style_text_color(id(flow_solar_label), mppt_online ? lv_color_hex(0xFFCC00) : grey, 0);
+          lv_obj_set_style_text_color(id(flow_battery_label), shunt_online ? lv_color_hex(0x00CC66) : grey, 0);
+          lv_obj_set_style_text_color(id(flow_mains_label), charger_online ? lv_color_hex(0x00CCCC) : grey, 0);
+          // Van depends on shunt (load data comes from shunt current)
+          lv_obj_set_style_text_color(id(flow_van_icon), shunt_online ? lv_color_hex(0xFF8800) : grey, 0);
+          lv_obj_set_style_text_color(id(flow_van_label), shunt_online ? lv_color_hex(0xFF8800) : grey, 0);
+
+          // Show/hide "No Connected Devices" label
+          if (all_offline) {
+            lv_obj_clear_flag(id(flow_no_devices_label), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(flow_ttg_title), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(flow_ttg_label), LV_OBJ_FLAG_HIDDEN);
+          } else {
+            lv_obj_add_flag(id(flow_no_devices_label), LV_OBJ_FLAG_HIDDEN);
+          }
 
           // Read sensors (NaN if not yet received)
           float pv_power = id(mppt_pv_power).state;
@@ -3988,6 +4901,78 @@ interval:
             }
           }
 
+          // Energy Balance (35)
+          if (!std::isnan(yield_today)) {
+            snprintf(buf, sizeof(buf), "%.2f kWh", yield_today);
+            lv_label_set_text(id(eb_yield_label), buf);
+          }
+          if (!std::isnan(soc)) {
+            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            lv_label_set_text(id(eb_soc_label), buf);
+          }
+          if (!std::isnan(consumed_ah)) {
+            snprintf(buf, sizeof(buf), "%.1f Ah consumed", consumed_ah);
+            lv_label_set_text(id(eb_consumed_label), buf);
+          }
+          if (!std::isnan(shunt_i)) {
+            snprintf(buf, sizeof(buf), "%+.1f A", shunt_i);
+            lv_label_set_text(id(eb_current_label), buf);
+            lv_obj_set_style_text_color(id(eb_current_label),
+              lv_color_hex(shunt_i >= 0 ? 0x00CC66 : 0xFF8800), 0);
+          }
+          {
+            auto now_ts = id(sntp_time).now().timestamp;
+            float smin = shunt_soc_hist.get_min(now_ts);
+            float smax = shunt_soc_hist.get_max(now_ts);
+            if (!std::isnan(smin) && !std::isnan(smax)) {
+              snprintf(buf, sizeof(buf), "SOC: %.0f \u2014 %.0f %%", smin, smax);
+              lv_label_set_text(id(eb_soc_range_label), buf);
+            }
+            float peak = solar_power_hist.get_max(now_ts);
+            if (!std::isnan(peak)) {
+              snprintf(buf, sizeof(buf), "Peak: %.0f W", peak);
+              lv_label_set_text(id(eb_peak_solar_label), buf);
+            }
+          }
+
+          // --- Battery Alarm ---
+          int threshold = id(bat_alarm_threshold);
+          if (threshold > 0 && !std::isnan(soc) && shunt_online) {
+            if (soc < (float)threshold && id(bat_alarm_armed) && !id(bat_alarm_active)) {
+              // Fire alarm
+              id(bat_alarm_armed) = false;
+              id(bat_alarm_active) = true;
+              id(bat_alarm_start_ms) = now;
+              // Wake screen if off/dimmed/screensaver
+              if (id(screen_state) != 0) {
+                if (id(screen_state) == 2 && id(screensaver_mode) == 1) {
+                  lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+                }
+                id(backlight).set_level(id(screen_brightness_pct) / 100.0f);
+                id(backlight).turn_on();
+                id(lvgl_comp)->set_paused(false, false);
+                id(screen_state) = 0;
+              }
+              // Update SOC label and show popup
+              snprintf(buf, sizeof(buf), "%.0f %%", soc);
+              lv_label_set_text(id(bat_alarm_soc_label), buf);
+              lv_obj_clear_flag(id(bat_alarm_popup), LV_OBJ_FLAG_HIDDEN);
+              // Play alarm beep
+              id(rtttl_player)->stop();
+              id(rtttl_player)->play("beep:d=16,o=6,b=140:c,p,c,p,c");
+              ESP_LOGW("alarm", "Battery alarm fired: SOC=%.0f%% threshold=%d%%", soc, threshold);
+            } else if (soc >= (float)threshold && !id(bat_alarm_armed)) {
+              // Re-arm when SOC recovers
+              id(bat_alarm_armed) = true;
+              ESP_LOGI("alarm", "Battery alarm re-armed: SOC=%.0f%%", soc);
+            }
+          }
+          // Update popup SOC label while visible
+          if (id(bat_alarm_active) && !std::isnan(soc)) {
+            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            lv_label_set_text(id(bat_alarm_soc_label), buf);
+          }
+
 # 1. The "Hello World" Text
   - interval: 5s
     then:
@@ -4016,19 +5001,38 @@ interval:
           update_ble(id(ble_shunt_label), id(shunt_last_ms), now);
           update_ble(id(ble_charger_label), id(charger_last_ms), now);
 
+          // --- Battery alarm sound looping ---
+          if (id(bat_alarm_active)) {
+            uint32_t elapsed = now - id(bat_alarm_start_ms);
+            if (elapsed < 120000) {
+              // Re-trigger beep every 5s for 2 minutes
+              id(rtttl_player)->stop();
+              id(rtttl_player)->play("beep:d=16,o=6,b=140:c,p,c,p,c");
+            }
+          }
+
   - interval: 1s
     then:
       - lambda: |-
           auto time = id(sntp_time).now();
           if (!time.is_valid()) return;
           char buf[16];
-          snprintf(buf, sizeof(buf), "%02d:%02d", time.hour, time.minute);
-          lv_label_set_text(id(clock_time_label), buf);
-          snprintf(buf, sizeof(buf), ":%02d", time.second);
-          lv_label_set_text(id(clock_seconds_label), buf);
-          const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
-          snprintf(buf, sizeof(buf), "%d %s %d", time.day_of_month, months[time.month - 1], time.year);
-          lv_label_set_text(id(clock_date_label), buf);
+
+          // Screensaver clock update
+          if (id(screen_state) == 2 && id(screensaver_mode) == 1) {
+            snprintf(buf, sizeof(buf), "%02d:%02d", time.hour, time.minute);
+            lv_label_set_text(id(ss_time_label), buf);
+            const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+            char dbuf[20];
+            snprintf(dbuf, sizeof(dbuf), "%d %s %d", time.day_of_month, months[time.month - 1], time.year);
+            lv_label_set_text(id(ss_date_label), dbuf);
+            float soc = id(shunt_soc).state;
+            if (!std::isnan(soc)) {
+              char sbuf[16];
+              snprintf(sbuf, sizeof(sbuf), "%.0f %%", soc);
+              lv_label_set_text(id(ss_soc_label), sbuf);
+            }
+          }
 
   - interval: 30s
     then:
@@ -4112,6 +5116,11 @@ interval:
             lv_label_set_text(id(ping_result_label), buf);
             lv_obj_set_style_text_color(id(ping_result_label), lv_color_hex(0xFF4444), 0);
           }
+
+button:
+  - platform: restart
+    id: restart_button
+    name: "Restart"
 
 text_sensor:
   - platform: wifi_info
@@ -4339,3 +5348,30 @@ sensor:
     humidity:
       id: fridge_humidity
       name: "Fridge Humidity"
+
+  # --- QMI8658 IMU (spirit level) ---
+  - platform: qmi8658
+    address: 0x6B
+    acceleration_x:
+      id: accel_x
+      internal: true
+      filters:
+        - exponential_moving_average:
+            alpha: 0.5
+            send_every: 1
+    acceleration_y:
+      id: accel_y
+      internal: true
+    acceleration_z:
+      id: accel_z
+      internal: true
+      filters:
+        - exponential_moving_average:
+            alpha: 0.5
+            send_every: 1
+    temperature:
+      id: imu_temp
+      internal: true
+    update_interval: 200ms
+    acceleration_range: "2G"
+    acceleration_odr: "125hz"
