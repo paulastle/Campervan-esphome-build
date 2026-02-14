@@ -4307,6 +4307,7 @@ interval:
     then:
       - lambda: |-
           static uint32_t prev_idle = 0, tap_ms = 0, off_since = 0;
+          static int wake_count = 0;
           int state = id(screen_state);
           uint32_t now_ms = millis();
 
@@ -4357,12 +4358,19 @@ interval:
             if (now_ms - off_since < 10000) return;
             int gpio4 = gpio_get_level(GPIO_NUM_4);
             if (gpio4 == 0) {
-              ESP_LOGW("screen", "WAKE: GPIO4 LOW (off for %lums)", (unsigned long)(now_ms - off_since));
-              id(backlight).set_level(id(screen_brightness_pct) / 100.0f);
-              id(backlight).turn_on();
-              id(lvgl_comp)->set_paused(false, false);
-              id(screen_state) = 0;
-              off_since = 0;
+              wake_count++;
+              if (wake_count >= 2) {
+                // GPIO4 LOW for 2 consecutive polls (100ms) — real touch
+                ESP_LOGW("screen", "WAKE: GPIO4 LOW x%d (off for %lums)", wake_count, (unsigned long)(now_ms - off_since));
+                id(backlight).set_level(id(screen_brightness_pct) / 100.0f);
+                id(backlight).turn_on();
+                id(lvgl_comp)->set_paused(false, false);
+                id(screen_state) = 0;
+                off_since = 0;
+                wake_count = 0;
+              }
+            } else {
+              wake_count = 0;
             }
           }
   - interval: 500ms
