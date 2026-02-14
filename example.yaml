@@ -53,6 +53,7 @@ esphome:
             lv_label_set_text(id(screen_bright_label), bbuf);
             snprintf(bbuf, sizeof(bbuf), "%d %%", id(saver_brightness_pct));
             lv_label_set_text(id(saver_bright_label), bbuf);
+            lv_label_set_text(id(night_mode_label), id(auto_night_mode) ? "On" : "Off");
             // Boot to Flow page instead of Splash
             id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_NONE, 0);
 
@@ -153,6 +154,10 @@ globals:
     type: int
     restore_value: no
     initial_value: '15'
+  - id: auto_night_mode
+    type: int
+    restore_value: yes
+    initial_value: '0'
 
 i2c:
   frequency: 400kHz
@@ -3985,14 +3990,14 @@ lvgl:
         # Screen Brightness row
         - label:
             align: CENTER
-            y: -90
+            y: -125
             text: "Screen"
             text_font: roboto24
             text_color: 0xCCCCCC
         - button:
             align: CENTER
             x: -90
-            y: -45
+            y: -80
             width: 64
             height: 64
             radius: 32
@@ -4019,14 +4024,14 @@ lvgl:
         - label:
             id: screen_bright_label
             align: CENTER
-            y: -45
+            y: -80
             text: "100 %"
             text_font: roboto24
             text_color: 0xFFFFFF
         - button:
             align: CENTER
             x: 90
-            y: -45
+            y: -80
             width: 64
             height: 64
             radius: 32
@@ -4053,14 +4058,14 @@ lvgl:
         # Saver Brightness row
         - label:
             align: CENTER
-            y: 0
+            y: -35
             text: "Saver"
             text_font: roboto24
             text_color: 0xCCCCCC
         - button:
             align: CENTER
             x: -90
-            y: 45
+            y: 10
             width: 64
             height: 64
             radius: 32
@@ -4087,14 +4092,14 @@ lvgl:
         - label:
             id: saver_bright_label
             align: CENTER
-            y: 45
+            y: 10
             text: "10 %"
             text_font: roboto24
             text_color: 0xFFFFFF
         - button:
             align: CENTER
             x: 90
-            y: 45
+            y: 10
             width: 64
             height: 64
             radius: 32
@@ -4112,6 +4117,62 @@ lvgl:
                   if (id(screen_state) == 2) {
                     id(backlight).set_level(v / 100.0f);
                   }
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Night Mode row
+        - label:
+            align: CENTER
+            y: 55
+            text: "Night Mode"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: 100
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(auto_night_mode) ? 0 : 1;
+                  id(auto_night_mode) = v;
+                  lv_label_set_text(id(night_mode_label), v ? "On" : "Off");
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: night_mode_label
+            align: CENTER
+            y: 100
+            text: "Off"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: 100
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(auto_night_mode) ? 0 : 1;
+                  id(auto_night_mode) = v;
+                  lv_label_set_text(id(night_mode_label), v ? "On" : "Off");
             widgets:
               - label:
                   align: CENTER
@@ -4226,6 +4287,12 @@ interval:
           // ON/DIM → SCREENSAVER (when off timeout reached)
           if (off_s > 0 && idle_ms >= (uint32_t)(off_s * 1000) && state < 2) {
             int mode = id(screensaver_mode);
+            if (id(auto_night_mode) && mode != 0) {
+              auto time = id(sntp_time).now();
+              if (time.is_valid() && (time.hour >= 21 || time.hour < 7)) {
+                mode = 0;  // Force screensaver off at night
+              }
+            }
             if (mode == 0) {
               // Off: skip screensaver, go straight to OFF
               ESP_LOGI("screen", "IDLE → OFF (screensaver disabled)");
