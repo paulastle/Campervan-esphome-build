@@ -3705,13 +3705,6 @@ lvgl:
             text: "Batt Voltage: -- V"
             text_font: roboto24
             text_color: 0xCCCCCC
-        - label:
-            id: mains_status_ac_label
-            align: CENTER
-            y: 105
-            text: "AC Current: -- A"
-            text_font: roboto24
-            text_color: 0xCCCCCC
 
     # === Page 32: Mains History ===
     - id: mains_history_page
@@ -4299,19 +4292,8 @@ interval:
           int dim_s = id(dim_timeout_sec);
           int off_s = id(off_timeout_sec);
 
-          // SCREENSAVER active: auto-off after 5 minutes
+          // SCREENSAVER active: nothing else to do
           if (state == 2) {
-            uint32_t elapsed = millis() - id(screensaver_start_ms);
-            if (elapsed > 300000) {
-              ESP_LOGI("screen", "SCREENSAVER → OFF (5min timeout)");
-              if (id(screensaver_mode) == 1) {
-                lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
-              }
-              id(backlight).set_level(0.0);
-              id(backlight).turn_off();
-              id(lvgl_comp)->set_paused(true, false);
-              id(screen_state) = 3;
-            }
             return;
           }
 
@@ -4434,7 +4416,7 @@ interval:
           if (std::isnan(soc)) {
             lv_label_set_text(id(flow_battery_label), "-- %");
           } else {
-            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            snprintf(buf, sizeof(buf), "%d %%", (int)soc);
             lv_label_set_text(id(flow_battery_label), buf);
           }
 
@@ -4544,7 +4526,7 @@ interval:
           // Battery sub-page
           if (!std::isnan(soc)) {
             lv_arc_set_value(id(battery_arc), (int)soc);
-            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            snprintf(buf, sizeof(buf), "%d %%", (int)soc);
             lv_label_set_text(id(battery_value_label), buf);
           }
           // Solar sub-page
@@ -4651,7 +4633,6 @@ interval:
           float consumed_ah = id(shunt_consumed_ah).state;
           float shunt_temp = id(shunt_temperature).state;
           float mains_v = id(mains_voltage).state;
-          float mains_ac = id(mains_ac_current).state;
           auto mppt_state = id(mppt_device_state).state;
           auto mppt_error = id(mppt_charger_error).state;
           auto mains_state = id(mains_device_state).state;
@@ -4668,7 +4649,7 @@ interval:
           if (std::isnan(soc)) {
             lv_label_set_text(id(energy_battery_summary), "-- %");
           } else {
-            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            snprintf(buf, sizeof(buf), "%d %%", (int)soc);
             lv_label_set_text(id(energy_battery_summary), buf);
           }
           if (std::isnan(mains_power)) {
@@ -4748,7 +4729,7 @@ interval:
           // Battery Live (27)
           if (!std::isnan(soc)) {
             lv_arc_set_value(id(batt_live_arc), (int)soc);
-            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            snprintf(buf, sizeof(buf), "%d %%", (int)soc);
             lv_label_set_text(id(batt_live_soc_label), buf);
           }
           if (!std::isnan(shunt_v)) {
@@ -4860,10 +4841,6 @@ interval:
             snprintf(buf, sizeof(buf), "Batt Voltage: %.2f V", mains_v);
             lv_label_set_text(id(mains_status_voltage_label), buf);
           }
-          if (!std::isnan(mains_ac)) {
-            snprintf(buf, sizeof(buf), "AC Current: %.1f A", mains_ac);
-            lv_label_set_text(id(mains_status_ac_label), buf);
-          }
 
           // Mains History (32)
           {
@@ -4890,7 +4867,7 @@ interval:
             lv_label_set_text(id(eb_yield_label), buf);
           }
           if (!std::isnan(soc)) {
-            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            snprintf(buf, sizeof(buf), "%d %%", (int)soc);
             lv_label_set_text(id(eb_soc_label), buf);
           }
           if (!std::isnan(consumed_ah)) {
@@ -4944,7 +4921,7 @@ interval:
                 id(screen_state) = 0;
               }
               // Update SOC label and show popup
-              snprintf(buf, sizeof(buf), "%.0f %%", soc);
+              snprintf(buf, sizeof(buf), "%d %%", (int)soc);
               lv_label_set_text(id(bat_alarm_soc_label), buf);
               lv_obj_clear_flag(id(bat_alarm_popup), LV_OBJ_FLAG_HIDDEN);
               // Play alarm beep
@@ -4959,7 +4936,7 @@ interval:
           }
           // Update popup SOC label while visible
           if (id(bat_alarm_active) && !std::isnan(soc)) {
-            snprintf(buf, sizeof(buf), "%.0f %%", soc);
+            snprintf(buf, sizeof(buf), "%d %%", (int)soc);
             lv_label_set_text(id(bat_alarm_soc_label), buf);
           }
 
@@ -5026,7 +5003,7 @@ interval:
             float soc = id(shunt_soc).state;
             if (!std::isnan(soc)) {
               char sbuf[16];
-              snprintf(sbuf, sizeof(sbuf), "%.0f %%", soc);
+              snprintf(sbuf, sizeof(sbuf), "%d %%", (int)soc);
               lv_label_set_text(id(ss_soc_label), sbuf);
             }
           }
@@ -5299,11 +5276,6 @@ sensor:
     on_value:
       - lambda: |-
           if (!std::isnan(x)) mains_power_hist.record(x, id(sntp_time).now().timestamp);
-  - platform: victron_ble
-    victron_ble_id: victron_charger
-    name: "Mains AC Current"
-    id: mains_ac_current
-    type: AC_CURRENT
 
   # --- ThermoPro BLE temperature/humidity sensors ---
   - platform: thermopro_ble
