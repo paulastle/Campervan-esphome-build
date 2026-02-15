@@ -177,10 +177,19 @@ spd2010_glue:
 
 # Enable logging
 logger:
+  level: DEBUG
+  logs:
+    sensor: WARN
+    text_sensor: WARN
+    victron_ble: WARN
+    victron_ble.text_sensor: WARN
 
 # Enable Home Assistant API
 api:
   reboot_timeout: 0s
+  max_connections: 3
+  encryption:
+    key: "***REMOVED***"
 
 # Allow Over-The-Air updates
 ota:
