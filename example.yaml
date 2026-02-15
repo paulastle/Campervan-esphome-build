@@ -182,7 +182,7 @@ logger:
     sensor: WARN
     text_sensor: WARN
     victron_ble: WARN
-    victron_ble.text_sensor: WARN
+    victron_ble.text_sensor: ERROR
 
 # Enable Home Assistant API
 api:
@@ -316,6 +316,8 @@ font:
       - "\U000F00E2"  # mdi-brightness-6
       - "\U000F0336"  # mdi-monitor-off
       - "\U000F004D"  # mdi-arrow-left
+      - "\U000F07D0"  # mdi-home-assistant
+      - "\U000F07D1"  # mdi-home-automation (wifi status)
   - file:
       type: web
       url: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
@@ -2119,6 +2121,8 @@ lvgl:
             lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
             lv_obj_add_flag(id(flow_no_devices_label), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(flow_wifi_icon), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(flow_ha_icon), LV_OBJ_FLAG_HIDDEN);
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -2132,6 +2136,23 @@ lvgl:
       on_swipe_up:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
       widgets:
+        # --- WiFi & HA status icons (top corners) ---
+        - label:
+            id: flow_wifi_icon
+            align: CENTER
+            x: -95
+            y: 105
+            text: "\U000F07D1"
+            text_font: mdi32
+            text_color: 0x44AA44
+        - label:
+            id: flow_ha_icon
+            align: CENTER
+            x: 95
+            y: 105
+            text: "\U000F07D0"
+            text_font: mdi32
+            text_color: 0x18BCF2
         # --- Solar icon (top center) ---
         - label:
             id: flow_solar_icon
@@ -4369,6 +4390,14 @@ interval:
 
           // --- Flow page (15) ---
           if (page == 15) {
+          // WiFi & HA status icons
+          bool wifi_ok = wifi::global_wifi_component->is_connected();
+          bool ha_ok = api::global_api_server->is_connected();
+          if (wifi_ok) lv_obj_clear_flag(id(flow_wifi_icon), LV_OBJ_FLAG_HIDDEN);
+          else lv_obj_add_flag(id(flow_wifi_icon), LV_OBJ_FLAG_HIDDEN);
+          if (ha_ok) lv_obj_clear_flag(id(flow_ha_icon), LV_OBJ_FLAG_HIDDEN);
+          else lv_obj_add_flag(id(flow_ha_icon), LV_OBJ_FLAG_HIDDEN);
+
           lv_color_t grey = lv_color_hex(0x555555);
 
           // Grey out icons for offline devices
