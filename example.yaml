@@ -38,9 +38,9 @@ esphome:
                 break;
               }
             }
-            const char* alarm_labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %"};
-            int alarm_vals[] = {0, 10, 15, 20, 25, 30};
-            for (int i = 0; i < 6; i++) {
+            const char* alarm_labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %", "96 %", "97 %", "98 %"};
+            int alarm_vals[] = {0, 10, 15, 20, 25, 30, 96, 97, 98};
+            for (int i = 0; i < 9; i++) {
               if (alarm_vals[i] == id(bat_alarm_threshold)) {
                 lv_label_set_text(id(alarm_value_label),alarm_labels[i]);
                 break;
@@ -634,20 +634,21 @@ lvgl:
           widgets:
             - label:
                 align: CENTER
-                y: -100
+                y: -110
                 text: "\U000F0046"
                 text_font: mdi48
                 text_color: 0xFF4444
             - label:
                 align: CENTER
                 y: -55
-                text: "Low Battery"
+                text: "Low Leisure\nBattery"
+                text_align: CENTER
                 text_font: roboto32
                 text_color: 0xFFFFFF
             - label:
                 id: bat_alarm_soc_label
                 align: CENTER
-                y: -10
+                y: 20
                 text: ""
                 text_font: roboto48
                 text_color: 0xFF6644
@@ -3838,12 +3839,12 @@ lvgl:
             pad_all: 0
             on_click:
               - lambda: |-
-                  int vals[] = {0, 10, 15, 20, 25, 30};
-                  const char* labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %"};
+                  int vals[] = {0, 10, 15, 20, 25, 30, 96, 97, 98};
+                  const char* labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %", "96 %", "97 %", "98 %"};
                   int current = id(bat_alarm_threshold);
                   int idx = 0;
-                  for (int i = 0; i < 6; i++) if (vals[i] == current) { idx = i; break; }
-                  idx = (idx - 1 + 6) % 6;
+                  for (int i = 0; i < 9; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx - 1 + 9) % 9;
                   id(bat_alarm_threshold) = vals[idx];
                   lv_label_set_text(id(alarm_value_label),labels[idx]);
             widgets:
@@ -3873,12 +3874,12 @@ lvgl:
             pad_all: 0
             on_click:
               - lambda: |-
-                  int vals[] = {0, 10, 15, 20, 25, 30};
-                  const char* labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %"};
+                  int vals[] = {0, 10, 15, 20, 25, 30, 96, 97, 98};
+                  const char* labels[] = {"Off", "10 %", "15 %", "20 %", "25 %", "30 %", "96 %", "97 %", "98 %"};
                   int current = id(bat_alarm_threshold);
                   int idx = 0;
-                  for (int i = 0; i < 6; i++) if (vals[i] == current) { idx = i; break; }
-                  idx = (idx + 1) % 6;
+                  for (int i = 0; i < 9; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx + 1) % 9;
                   id(bat_alarm_threshold) = vals[idx];
                   lv_label_set_text(id(alarm_value_label),labels[idx]);
             widgets:
@@ -4921,8 +4922,9 @@ interval:
 
           // --- Battery Alarm ---
           int threshold = id(bat_alarm_threshold);
+          float trigger = (float)(threshold + 1);  // setting 97% triggers when SOC < 98.0
           if (threshold > 0 && !std::isnan(soc) && shunt_online) {
-            if (soc < (float)threshold && id(bat_alarm_armed) && !id(bat_alarm_active)) {
+            if (soc < trigger && id(bat_alarm_armed) && !id(bat_alarm_active)) {
               // Fire alarm
               id(bat_alarm_armed) = false;
               id(bat_alarm_active) = true;
@@ -4948,8 +4950,8 @@ interval:
               // Play alarm beep
               id(rtttl_player)->stop();
               id(rtttl_player)->play("beep:d=16,o=6,b=140:c,p,c,p,c");
-              ESP_LOGW("alarm", "Battery alarm fired: SOC=%.0f%% threshold=%d%%", soc, threshold);
-            } else if (soc >= (float)threshold && !id(bat_alarm_armed)) {
+              ESP_LOGW("alarm", "Battery alarm fired: SOC=%.1f%% trigger=%.0f%% (setting=%d%%)", soc, trigger, threshold);
+            } else if (soc >= trigger && !id(bat_alarm_armed)) {
               // Re-arm when SOC recovers
               id(bat_alarm_armed) = true;
               ESP_LOGI("alarm", "Battery alarm re-armed: SOC=%.0f%%", soc);
@@ -5002,6 +5004,13 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
+          // Flash alarm popup red/black
+          if (id(bat_alarm_active)) {
+            static bool flash_on = false;
+            flash_on = !flash_on;
+            lv_obj_set_style_bg_color(id(bat_alarm_popup), flash_on ? lv_color_hex(0x660000) : lv_color_hex(0x000000), 0);
+          }
+
           auto time = id(sntp_time).now();
           if (!time.is_valid()) return;
           char buf[16];
