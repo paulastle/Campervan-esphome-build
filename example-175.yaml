@@ -349,6 +349,10 @@ debug:
 
 font:
   - file: "gfonts://Roboto"
+    id: roboto128
+    size: 128
+    bpp: 4
+  - file: "gfonts://Roboto"
     id: roboto96
     size: 96
     bpp: 4
@@ -820,9 +824,9 @@ lvgl:
             - label:
                 id: ss_time_label
                 align: CENTER
-                y: -20
+                y: -30
                 text: "--:--"
-                text_font: roboto96
+                text_font: roboto128
                 text_color: 0x888888
             # Date
             - label:
@@ -830,15 +834,15 @@ lvgl:
                 align: CENTER
                 y: 55
                 text: ""
-                text_font: roboto24
+                text_font: roboto32
                 text_color: 0x444444
             # SOC readout
             - label:
                 id: ss_soc_label
                 align: CENTER
-                y: 90
+                y: 100
                 text: ""
-                text_font: roboto32
+                text_font: roboto48
                 text_color: 0x224422
   pages:
     # === Page 0: Splash ===
