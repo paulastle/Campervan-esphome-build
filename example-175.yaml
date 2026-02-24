@@ -6,6 +6,7 @@ esphome:
   includes:
     - includes/net_test.h
     - includes/temp_history.h
+    - includes/bm6_decrypt.h
   on_boot:
     - priority: -100
       then:
@@ -251,6 +252,33 @@ esp32_ble_tracker:
     window: 1100ms
     active: false
 
+script:
+  - id: bm6_timeout
+    mode: restart
+    then:
+      - delay: 20s
+      - lambda: |-
+          lv_label_set_text(id(bm6_status_label), "Timeout");
+          lv_obj_set_style_text_color(id(bm6_status_label), lv_color_hex(0xFF8800), 0);
+          ESP_LOGW("bm6", "BM6 read timed out");
+      - ble_client.disconnect: bm6_client
+
+ble_client:
+  - id: bm6_client
+    mac_address: !secret bm6_mac
+    auto_connect: false
+    on_connect:
+      - delay: 500ms
+      - script.execute: bm6_timeout
+      - ble_client.ble_write:
+          id: bm6_client
+          service_uuid: "FFF0"
+          characteristic_uuid: "FFF3"
+          value: [0x69,0x7e,0xa0,0xb5,0xd5,0x4c,0xf0,0x24,0xe7,0x94,0x77,0x23,0x55,0x55,0x41,0x14]
+    on_disconnect:
+      - script.stop: bm6_timeout
+      - lambda: 'ESP_LOGD("bm6", "Disconnected from BM6");'
+
 victron_ble:
   - id: victron_mppt
     mac_address: !secret victron_mppt_mac
@@ -363,6 +391,7 @@ font:
       - "\U000F0531"  # mdi-tree
       - "\U000F0290"  # mdi-fridge
       - "\U000F0183"  # mdi-lightning-bolt
+      - "\U000F010C"  # mdi-car-battery
   - file: "gfonts://Roboto"
     id: roboto28
     size: 28
@@ -399,7 +428,16 @@ font:
       - "\U000F0183"  # mdi-lightning-bolt (Energy hub)
       - "\U000F0A72"  # mdi-solar-power (Solar hub)
       - "\U000F0079"  # mdi-battery (Shunt hub)
+      - "\U000F010C"  # mdi-car-battery
       - "\U000F0D3E"  # mdi-power-plug (Mains hub)
+  - file:
+      type: web
+      url: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
+    id: mdi96
+    size: 96
+    bpp: 4
+    glyphs:
+      - "\U000F010C"  # mdi-car-battery
 
 lvgl:
   id: lvgl_comp
@@ -482,6 +520,16 @@ lvgl:
             - obj:
                 id: dot6
                 x: 108
+                y: 0
+                width: 10
+                height: 10
+                radius: 5
+                bg_color: 0x555555
+                bg_opa: 100%
+                border_width: 0
+            - obj:
+                id: dot7
+                x: 126
                 y: 0
                 width: 10
                 height: 10
@@ -788,7 +836,7 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_set_width(id(dots_container), 136);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
@@ -796,13 +844,15 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot7), lv_color_hex(0xFFFFFF), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: "lv_indev_wait_release(lv_indev_get_act());"
@@ -844,6 +894,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -890,7 +941,7 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_set_width(id(dots_container), 136);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
@@ -898,13 +949,15 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot7), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -947,7 +1000,7 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_set_width(id(dots_container), 136);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
@@ -955,13 +1008,15 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot7), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -1012,6 +1067,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -1084,6 +1140,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -1156,6 +1213,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -1226,6 +1284,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -1302,6 +1361,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -1378,6 +1438,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -1491,6 +1552,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -1635,6 +1697,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -1748,6 +1811,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -1807,6 +1871,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -1939,6 +2004,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -2172,7 +2238,7 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_set_width(id(dots_container), 136);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
@@ -2180,6 +2246,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -2187,6 +2254,7 @@ lvgl:
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot7), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
             lv_obj_add_flag(id(flow_no_devices_label), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(flow_wifi_icon), LV_OBJ_FLAG_HIDDEN);
@@ -2356,7 +2424,7 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_set_width(id(dots_container), 136);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
@@ -2364,13 +2432,15 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot7), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -2379,7 +2449,7 @@ lvgl:
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(36, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_down:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -2494,6 +2564,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -2603,6 +2674,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -2712,6 +2784,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -2813,7 +2886,7 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_set_width(id(dots_container), 136);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
@@ -2821,6 +2894,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -2828,11 +2902,12 @@ lvgl:
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot7), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            id(lvgl_comp)->show_page(36, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -2905,6 +2980,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -2964,6 +3040,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -3023,6 +3100,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -3080,6 +3158,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -3190,6 +3269,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -3251,6 +3331,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -3331,6 +3412,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -3441,6 +3523,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -3516,6 +3599,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -3602,6 +3686,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -3712,6 +3797,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -3787,6 +3873,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -3857,6 +3944,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
@@ -3955,7 +4043,7 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 118);
+            lv_obj_set_width(id(dots_container), 136);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
@@ -3963,6 +4051,7 @@ lvgl:
             lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -3970,6 +4059,7 @@ lvgl:
             lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot7), lv_color_hex(0x555555), 0);
             id(settings_visible) = false;
       on_swipe_left:
         - lambda: |-
@@ -4059,6 +4149,7 @@ lvgl:
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
@@ -4270,6 +4361,103 @@ lvgl:
                   text: "\U000F0142"
                   text_font: mdi48
                   text_color: 0xFFFFFF
+
+    # === Page 36: BM6 Starter Battery ===
+    - id: bm6_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 136);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot7), lv_color_hex(0x555555), 0);
+            id(settings_visible) = false;
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(16, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(20, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        # Title
+        - label:
+            align: TOP_MID
+            y: 60
+            text: "Starter Battery"
+            text_font: roboto28
+            text_color: 0xCCCCCC
+        # Tap icon
+        - obj:
+            align: CENTER
+            y: -60
+            width: 150
+            height: 150
+            bg_opa: 0%
+            border_width: 0
+            on_click:
+              - lambda: |-
+                  lv_label_set_text(id(bm6_status_label), "Reading...");
+                  lv_obj_set_style_text_color(id(bm6_status_label), lv_color_hex(0x666666), 0);
+                  id(bm6_client).connect();
+              - script.execute: bm6_timeout
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F010C"
+                  text_font: mdi96
+                  text_color: 0x00AAFF
+        # Voltage
+        - label:
+            id: bm6_voltage_label
+            align: CENTER
+            y: 10
+            text: "-- V"
+            text_font: roboto48
+            text_color: 0x00CC66
+        # SOC
+        - label:
+            id: bm6_soc_label
+            align: CENTER
+            y: 70
+            text: "-- %"
+            text_font: roboto48
+            text_color: 0x00CC66
+        # Temperature
+        - label:
+            id: bm6_temp_label
+            align: CENTER
+            y: 125
+            text: "-- °C"
+            text_font: roboto32
+            text_color: 0xCCCCCC
+        # Status
+        - label:
+            id: bm6_status_label
+            align: CENTER
+            y: 165
+            text: "Tap to read"
+            text_font: roboto24
+            text_color: 0x666666
 
 interval:
   - interval: 50ms
@@ -5256,7 +5444,62 @@ text_sensor:
     id: mains_charger_error
     type: CHARGER_ERROR
 
+# --- BM6 Starter Battery BLE sensor ---
 sensor:
+  - platform: ble_client
+    id: bm6_ble_sensor
+    type: characteristic
+    ble_client_id: bm6_client
+    internal: true
+    service_uuid: "FFF0"
+    characteristic_uuid: "FFF4"
+    notify: true
+    lambda: |-
+      if (x.size() < 16) return NAN;
+      uint8_t key[] = {108,101,97,103,101,110,100,255,254,48,49,48,48,48,48,57};
+      uint8_t iv[16] = {0};
+      uint8_t plain[16];
+      esp_aes_context aes;
+      esp_aes_init(&aes);
+      esp_aes_setkey(&aes, key, 128);
+      esp_aes_crypt_cbc(&aes, ESP_AES_DECRYPT, 16, iv, x.data(), plain);
+      esp_aes_free(&aes);
+      // Skip ACK notifications (bytes 4+ all zeros = no data yet)
+      bool has_data = false;
+      for (int i = 4; i < 16; i++) { if (plain[i] != 0) { has_data = true; break; } }
+      if (!has_data) return NAN;
+      float temp = plain[4];
+      float soc = plain[6];
+      float voltage = ((plain[7] << 8) | plain[8]) / 100.0f;
+      id(bm6_voltage_tpl).publish_state(voltage);
+      id(bm6_soc_tpl).publish_state(soc);
+      id(bm6_temp_tpl).publish_state(temp);
+      char buf[16];
+      snprintf(buf, sizeof(buf), "%.2f V", voltage);
+      lv_label_set_text(id(bm6_voltage_label), buf);
+      snprintf(buf, sizeof(buf), "%.0f %%", soc);
+      lv_label_set_text(id(bm6_soc_label), buf);
+      lv_color_t soc_color;
+      if (soc >= 70) soc_color = lv_color_hex(0x00CC66);
+      else if (soc >= 30) soc_color = lv_color_hex(0xFF8800);
+      else soc_color = lv_color_hex(0xFF4444);
+      lv_obj_set_style_text_color(id(bm6_soc_label), soc_color, 0);
+      snprintf(buf, sizeof(buf), "%.0f °C", temp);
+      lv_label_set_text(id(bm6_temp_label), buf);
+      lv_label_set_text(id(bm6_status_label), "OK");
+      id(bm6_timeout).stop();
+      id(bm6_client).disconnect();
+      return voltage;
+  - platform: template
+    id: bm6_voltage_tpl
+    internal: true
+  - platform: template
+    id: bm6_soc_tpl
+    internal: true
+  - platform: template
+    id: bm6_temp_tpl
+    internal: true
+
   - platform: debug
     free:
       name: "Heap Free"
