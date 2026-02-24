@@ -166,6 +166,14 @@ globals:
     type: int
     restore_value: yes
     initial_value: '0'
+  - id: bm6_reading
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: bm6_last_read_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
 
 i2c:
   sda: GPIO15
@@ -258,6 +266,7 @@ script:
     then:
       - delay: 20s
       - lambda: |-
+          id(bm6_reading) = false;
           lv_label_set_text(id(bm6_status_label), "Timeout");
           lv_obj_set_style_text_color(id(bm6_status_label), lv_color_hex(0xFF8800), 0);
           ESP_LOGW("bm6", "BM6 read timed out");
@@ -277,7 +286,9 @@ ble_client:
           value: [0x69,0x7e,0xa0,0xb5,0xd5,0x4c,0xf0,0x24,0xe7,0x94,0x77,0x23,0x55,0x55,0x41,0x14]
     on_disconnect:
       - script.stop: bm6_timeout
-      - lambda: 'ESP_LOGD("bm6", "Disconnected from BM6");'
+      - lambda: |-
+          id(bm6_reading) = false;
+          ESP_LOGD("bm6", "Disconnected from BM6");
 
 victron_ble:
   - id: victron_mppt
@@ -4416,10 +4427,12 @@ lvgl:
             border_width: 0
             on_click:
               - lambda: |-
+                  if (id(bm6_reading)) return;
+                  id(bm6_reading) = true;
                   lv_label_set_text(id(bm6_status_label), "Reading...");
                   lv_obj_set_style_text_color(id(bm6_status_label), lv_color_hex(0x666666), 0);
                   id(bm6_client).connect();
-              - script.execute: bm6_timeout
+                  id(bm6_timeout).execute();
             widgets:
               - label:
                   align: CENTER
@@ -5272,6 +5285,23 @@ interval:
           }
           lv_label_set_text(id(info_uptime_label), buf);
 
+  - interval: 30s
+    then:
+      - lambda: |-
+          uint32_t last = id(bm6_last_read_ms);
+          if (last == 0) return;
+          uint32_t elapsed_s = (millis() - last) / 1000;
+          if (elapsed_s < 60) return;
+          char buf[32];
+          if (elapsed_s < 3600)
+            snprintf(buf, sizeof(buf), "Polled %lum ago", (unsigned long)(elapsed_s / 60));
+          else if (elapsed_s < 86400)
+            snprintf(buf, sizeof(buf), "Polled %luh ago", (unsigned long)(elapsed_s / 3600));
+          else
+            snprintf(buf, sizeof(buf), "Polled %lud ago", (unsigned long)(elapsed_s / 86400));
+          lv_label_set_text(id(bm6_status_label), buf);
+          lv_obj_set_style_text_color(id(bm6_status_label), lv_color_hex(0x666666), 0);
+
   - interval: 1s
     then:
       - lambda: |-
@@ -5340,6 +5370,17 @@ interval:
             lv_label_set_text(id(ping_result_label), buf);
             lv_obj_set_style_text_color(id(ping_result_label), lv_color_hex(0xFF4444), 0);
           }
+
+  - interval: 30min
+    then:
+      - lambda: |-
+          if (id(bm6_reading)) return;
+          id(bm6_reading) = true;
+          ESP_LOGI("bm6", "BM6 auto-read: connecting...");
+          lv_label_set_text(id(bm6_status_label), "Reading...");
+          lv_obj_set_style_text_color(id(bm6_status_label), lv_color_hex(0x666666), 0);
+          id(bm6_client).connect();
+          id(bm6_timeout).execute();
 
 binary_sensor:
   - platform: gpio
@@ -5487,18 +5528,32 @@ sensor:
       snprintf(buf, sizeof(buf), "%.0f °C", temp);
       lv_label_set_text(id(bm6_temp_label), buf);
       lv_label_set_text(id(bm6_status_label), "OK");
+      lv_obj_set_style_text_color(id(bm6_status_label), lv_color_hex(0x00CC66), 0);
+      id(bm6_last_read_ms) = millis();
       id(bm6_timeout).stop();
       id(bm6_client).disconnect();
       return voltage;
   - platform: template
     id: bm6_voltage_tpl
-    internal: true
+    name: "Starter Battery Voltage"
+    device_class: voltage
+    unit_of_measurement: "V"
+    state_class: measurement
+    accuracy_decimals: 2
   - platform: template
     id: bm6_soc_tpl
-    internal: true
+    name: "Starter Battery SOC"
+    device_class: battery
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
   - platform: template
     id: bm6_temp_tpl
-    internal: true
+    name: "Starter Battery Temperature"
+    device_class: temperature
+    unit_of_measurement: "°C"
+    state_class: measurement
+    accuracy_decimals: 0
 
   - platform: debug
     free:
