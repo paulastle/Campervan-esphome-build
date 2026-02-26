@@ -8,10 +8,25 @@ esphome:
     - includes/temp_history.h
     - includes/bm6_decrypt.h
   on_boot:
+    - priority: 500
+      then:
+        - lambda: |-
+            // Set display rotation BEFORE LVGL setup (priority 400) reads it
+            int rot = id(screen_rotation);
+            if (rot > 0 && rot <= 3) {
+              display::DisplayRotation rotations[] = {
+                display::DISPLAY_ROTATION_0_DEGREES,
+                display::DISPLAY_ROTATION_270_DEGREES,
+                display::DISPLAY_ROTATION_180_DEGREES,
+                display::DISPLAY_ROTATION_90_DEGREES
+              };
+              id(main_display).set_rotation(rotations[rot]);
+            }
     - priority: -100
       then:
         - delay: 300ms
         - lambda: |-
+            ESP_LOGW("campervan", "CampervanOS v11 booted");
             van_temp_hist.init();
             outside_temp_hist.init();
             fridge_temp_hist.init();
@@ -54,6 +69,41 @@ esphome:
             snprintf(bbuf, sizeof(bbuf), "%d %%", id(saver_brightness_pct));
             lv_label_set_text(id(saver_bright_label), bbuf);
             lv_label_set_text(id(night_mode_label), id(auto_night_mode) ? "On" : "Off");
+            // Sync starter alarm value label
+            const char* sv_labels[] = {"Off", "11.5 V", "11.6 V", "11.7 V", "11.8 V", "11.9 V", "12.0 V", "12.1 V", "12.2 V", "12.3 V", "12.4 V", "12.5 V"};
+            int sv_vals[] = {0, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125};
+            for (int i = 0; i < 12; i++) {
+              if (sv_vals[i] == id(starter_alarm_threshold)) {
+                lv_label_set_text(id(starter_alarm_value_label), sv_labels[i]);
+                break;
+              }
+            }
+            // Sync rotation value label and visual
+            const char* rot_labels[] = {"0°", "90°", "180°", "270°"};
+            const char* usb_labels[] = {"USB Left", "USB Top", "USB Right", "USB Bottom"};
+            int rot = id(screen_rotation);
+            if (rot < 0 || rot > 3) rot = 0;
+            lv_label_set_text(id(rotation_value_label), rot_labels[rot]);
+            lv_label_set_text(id(usb_pos_label), usb_labels[rot]);
+            switch (rot) {
+              case 0: lv_obj_set_size(id(usb_indicator), 12, 6);
+                      lv_obj_align(id(usb_indicator), LV_ALIGN_LEFT_MID, -4, 0); break;
+              case 1: lv_obj_set_size(id(usb_indicator), 6, 12);
+                      lv_obj_align(id(usb_indicator), LV_ALIGN_TOP_MID, 0, -4); break;
+              case 2: lv_obj_set_size(id(usb_indicator), 12, 6);
+                      lv_obj_align(id(usb_indicator), LV_ALIGN_RIGHT_MID, 4, 0); break;
+              case 3: lv_obj_set_size(id(usb_indicator), 6, 12);
+                      lv_obj_align(id(usb_indicator), LV_ALIGN_BOTTOM_MID, 0, 4); break;
+            }
+            // Apply touch rotation (display rotation set in priority 500 on_boot)
+            // Note: display 90/270 are swapped to match physical orientation
+            auto *ts = id(my_touchscreen);
+            switch (rot) {
+              case 0: ts->set_mirror_x(true); ts->set_mirror_y(true); ts->set_swap_xy(false); break;
+              case 1: ts->set_mirror_x(false); ts->set_mirror_y(true); ts->set_swap_xy(true); break;
+              case 2: ts->set_mirror_x(false); ts->set_mirror_y(false); ts->set_swap_xy(false); break;
+              case 3: ts->set_mirror_x(true); ts->set_mirror_y(false); ts->set_swap_xy(true); break;
+            }
             // Boot to Flow page instead of Splash
             id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_NONE, 0);
 
@@ -173,6 +223,26 @@ globals:
   - id: bm6_last_read_ms
     type: uint32_t
     restore_value: no
+    initial_value: '0'
+  - id: starter_alarm_threshold
+    type: int
+    restore_value: yes
+    initial_value: '120'
+  - id: starter_alarm_armed
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+  - id: starter_alarm_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: starter_alarm_start_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: screen_rotation
+    type: int
+    restore_value: yes
     initial_value: '0'
 
 i2c:
@@ -809,6 +879,65 @@ lvgl:
                 text_font: roboto24
                 text_color: 0xCCCCCC
       - obj:
+          id: starter_alarm_popup
+          align: CENTER
+          width: 466
+          height: 466
+          bg_color: 0x000000
+          bg_opa: 90%
+          border_width: 0
+          radius: 233
+          pad_all: 0
+          opa: LV_OPA_COVER
+          hidden: true
+          widgets:
+            - label:
+                align: CENTER
+                y: -110
+                text: "\U000F1901"
+                text_font: mdi48
+                text_color: 0xFF4444
+            - label:
+                align: CENTER
+                y: -55
+                text: "Low Starter\nBattery"
+                text_align: CENTER
+                text_font: roboto32
+                text_color: 0xFFFFFF
+            - label:
+                id: starter_alarm_voltage_label
+                align: CENTER
+                y: 20
+                text: ""
+                text_font: roboto48
+                text_color: 0xFF6644
+            - button:
+                align: CENTER
+                y: 110
+                width: 80
+                height: 80
+                radius: 40
+                bg_color: 0xCC2222
+                border_width: 0
+                pad_all: 0
+                on_click:
+                  - lambda: |-
+                      id(starter_alarm_active) = false;
+                      id(rtttl_player)->stop();
+                      lv_obj_add_flag(id(starter_alarm_popup), LV_OBJ_FLAG_HIDDEN);
+                widgets:
+                  - label:
+                      align: CENTER
+                      text: "OK"
+                      text_font: roboto32
+                      text_color: 0xFFFFFF
+            - label:
+                align: CENTER
+                y: 175
+                text: "Dismiss"
+                text_font: roboto24
+                text_color: 0xCCCCCC
+      - obj:
           id: clock_screensaver
           align: CENTER
           width: 466
@@ -891,7 +1020,7 @@ lvgl:
         - label:
             align: CENTER
             y: 140
-            text: "v9"
+            text: "v11"
             text_font: roboto24
             text_color: 0x666666
 
@@ -2011,11 +2140,11 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 50);
+            lv_obj_set_width(id(dots_container), 66);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
@@ -2023,6 +2152,7 @@ lvgl:
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
         - lambda: |-
@@ -3951,11 +4081,11 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 50);
+            lv_obj_set_width(id(dots_container), 66);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
@@ -3963,9 +4093,12 @@ lvgl:
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(37, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -3979,21 +4112,22 @@ lvgl:
       widgets:
         - label:
             align: CENTER
-            y: -100
+            y: -130
             text: "Battery Alarm"
             text_font: roboto32
             text_color: 0xFFFFFF
+        # --- SOC Threshold row ---
         - label:
             align: CENTER
-            y: -40
-            text: "SOC Threshold"
+            y: -80
+            text: "Leisure Batt SOC"
             text_font: roboto24
             text_color: 0xCCCCCC
-        # Alarm threshold stepper: left arrow
+        # SOC stepper: left arrow
         - button:
             align: CENTER
             x: -90
-            y: 15
+            y: -35
             width: 64
             height: 64
             radius: 32
@@ -4016,19 +4150,19 @@ lvgl:
                   text: "\U000F0141"
                   text_font: mdi48
                   text_color: 0xFFFFFF
-        # Alarm threshold stepper: value label
+        # SOC stepper: value label
         - label:
             id: alarm_value_label
             align: CENTER
-            y: 15
+            y: -35
             text: "20 %"
             text_font: roboto24
             text_color: 0xFFFFFF
-        # Alarm threshold stepper: right arrow
+        # SOC stepper: right arrow
         - button:
             align: CENTER
             x: 90
-            y: 15
+            y: -35
             width: 64
             height: 64
             radius: 32
@@ -4045,6 +4179,75 @@ lvgl:
                   idx = (idx + 1) % 9;
                   id(bat_alarm_threshold) = vals[idx];
                   lv_label_set_text(id(alarm_value_label),labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # --- Voltage Threshold row ---
+        - label:
+            align: CENTER
+            y: 35
+            text: "Starter Voltage"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        # Voltage stepper: left arrow
+        - button:
+            align: CENTER
+            x: -90
+            y: 80
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125};
+                  const char* labels[] = {"Off", "11.5 V", "11.6 V", "11.7 V", "11.8 V", "11.9 V", "12.0 V", "12.1 V", "12.2 V", "12.3 V", "12.4 V", "12.5 V"};
+                  int current = id(starter_alarm_threshold);
+                  int idx = 0;
+                  for (int i = 0; i < 12; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx - 1 + 12) % 12;
+                  id(starter_alarm_threshold) = vals[idx];
+                  lv_label_set_text(id(starter_alarm_value_label), labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Voltage stepper: value label
+        - label:
+            id: starter_alarm_value_label
+            align: CENTER
+            y: 80
+            text: "12.0 V"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Voltage stepper: right arrow
+        - button:
+            align: CENTER
+            x: 90
+            y: 80
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {0, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125};
+                  const char* labels[] = {"Off", "11.5 V", "11.6 V", "11.7 V", "11.8 V", "11.9 V", "12.0 V", "12.1 V", "12.2 V", "12.3 V", "12.4 V", "12.5 V"};
+                  int current = id(starter_alarm_threshold);
+                  int idx = 0;
+                  for (int i = 0; i < 12; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx + 1) % 12;
+                  id(starter_alarm_threshold) = vals[idx];
+                  lv_label_set_text(id(starter_alarm_value_label), labels[idx]);
             widgets:
               - label:
                   align: CENTER
@@ -4156,11 +4359,11 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 50);
+            lv_obj_set_width(id(dots_container), 66);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
@@ -4168,6 +4371,7 @@ lvgl:
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
         - lambda: |-
@@ -4476,6 +4680,189 @@ lvgl:
             text_font: roboto24
             text_color: 0x666666
 
+    # === Page 37: Display Settings ===
+    - id: display_settings_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 66);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = true;
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(33, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: CENTER
+            y: -140
+            text: "Display"
+            text_font: roboto32
+            text_color: 0xFFFFFF
+        # Rotation visual: circle outline with USB indicator
+        - obj:
+            id: rotation_circle
+            align: CENTER
+            y: -70
+            width: 80
+            height: 80
+            radius: 40
+            bg_opa: 0%
+            border_width: 2
+            border_color: 0x666666
+            pad_all: 0
+            widgets:
+              - obj:
+                  id: usb_indicator
+                  align: LEFT_MID
+                  x: -4
+                  width: 12
+                  height: 6
+                  radius: 2
+                  bg_color: 0xFF8800
+                  border_width: 0
+        - label:
+            id: usb_pos_label
+            align: CENTER
+            y: -20
+            text: "USB Left"
+            text_font: roboto24
+            text_color: 0x888888
+        # Rotation stepper: left arrow
+        - button:
+            align: CENTER
+            x: -90
+            y: 30
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  const char* labels[] = {"0°", "90°", "180°", "270°"};
+                  const char* usb[] = {"USB Left", "USB Top", "USB Right", "USB Bottom"};
+                  int r = id(screen_rotation);
+                  r = (r - 1 + 4) % 4;
+                  id(screen_rotation) = r;
+                  lv_label_set_text(id(rotation_value_label), labels[r]);
+                  lv_label_set_text(id(usb_pos_label), usb[r]);
+                  switch (r) {
+                    case 0: lv_obj_set_size(id(usb_indicator), 12, 6);
+                            lv_obj_align(id(usb_indicator), LV_ALIGN_LEFT_MID, -4, 0); break;
+                    case 1: lv_obj_set_size(id(usb_indicator), 6, 12);
+                            lv_obj_align(id(usb_indicator), LV_ALIGN_TOP_MID, 0, -4); break;
+                    case 2: lv_obj_set_size(id(usb_indicator), 12, 6);
+                            lv_obj_align(id(usb_indicator), LV_ALIGN_RIGHT_MID, 4, 0); break;
+                    case 3: lv_obj_set_size(id(usb_indicator), 6, 12);
+                            lv_obj_align(id(usb_indicator), LV_ALIGN_BOTTOM_MID, 0, 4); break;
+                  }
+                  lv_obj_clear_flag(id(rotation_reboot_btn), LV_OBJ_FLAG_HIDDEN);
+                  lv_obj_clear_flag(id(rotation_reboot_label), LV_OBJ_FLAG_HIDDEN);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Rotation stepper: value label
+        - label:
+            id: rotation_value_label
+            align: CENTER
+            y: 30
+            text: "0°"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        # Rotation stepper: right arrow
+        - button:
+            align: CENTER
+            x: 90
+            y: 30
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  const char* labels[] = {"0°", "90°", "180°", "270°"};
+                  const char* usb[] = {"USB Left", "USB Top", "USB Right", "USB Bottom"};
+                  int r = id(screen_rotation);
+                  r = (r + 1) % 4;
+                  id(screen_rotation) = r;
+                  lv_label_set_text(id(rotation_value_label), labels[r]);
+                  lv_label_set_text(id(usb_pos_label), usb[r]);
+                  switch (r) {
+                    case 0: lv_obj_set_size(id(usb_indicator), 12, 6);
+                            lv_obj_align(id(usb_indicator), LV_ALIGN_LEFT_MID, -4, 0); break;
+                    case 1: lv_obj_set_size(id(usb_indicator), 6, 12);
+                            lv_obj_align(id(usb_indicator), LV_ALIGN_TOP_MID, 0, -4); break;
+                    case 2: lv_obj_set_size(id(usb_indicator), 12, 6);
+                            lv_obj_align(id(usb_indicator), LV_ALIGN_RIGHT_MID, 4, 0); break;
+                    case 3: lv_obj_set_size(id(usb_indicator), 6, 12);
+                            lv_obj_align(id(usb_indicator), LV_ALIGN_BOTTOM_MID, 0, 4); break;
+                  }
+                  lv_obj_clear_flag(id(rotation_reboot_btn), LV_OBJ_FLAG_HIDDEN);
+                  lv_obj_clear_flag(id(rotation_reboot_label), LV_OBJ_FLAG_HIDDEN);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Reboot button (shown when rotation changes)
+        - button:
+            id: rotation_reboot_btn
+            align: CENTER
+            y: 105
+            width: 70
+            height: 70
+            radius: 35
+            bg_color: 0xFF8800
+            border_width: 0
+            pad_all: 0
+            hidden: true
+            on_click:
+              - lambda: "global_preferences->sync();"
+              - delay: 100ms
+              - button.press: restart_button
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0709"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: rotation_reboot_label
+            align: CENTER
+            y: 155
+            text: "Reboot"
+            text_font: roboto24
+            text_color: 0xFF8800
+            hidden: true
+
 interval:
   - interval: 50ms
     then:
@@ -4555,7 +4942,7 @@ interval:
           int state = id(screen_state);
           if (state >= 3) return;  // OFF: handled by 50ms GPIO poll
 
-          if (id(settings_visible) || id(bat_alarm_active)) return;
+          if (id(settings_visible) || id(bat_alarm_active) || id(starter_alarm_active)) return;
 
           uint32_t idle_ms = lv_disp_get_inactive_time(NULL);
           int dim_s = id(dim_timeout_sec);
@@ -5207,6 +5594,54 @@ interval:
             lv_label_set_text(id(bat_alarm_soc_label), buf);
           }
 
+          // --- Starter Battery Voltage Alarm ---
+          int s_thresh = id(starter_alarm_threshold);
+          if (s_thresh > 0) {
+            float voltage = id(bm6_voltage_tpl).state;
+            float s_trigger = s_thresh / 10.0f;
+            if (!std::isnan(voltage) && voltage > 0) {
+              if (voltage < s_trigger && id(starter_alarm_armed) && !id(starter_alarm_active)) {
+                // Fire alarm
+                id(starter_alarm_armed) = false;
+                id(starter_alarm_active) = true;
+                id(starter_alarm_start_ms) = now;
+                // Wake screen if off/dimmed/screensaver
+                if (id(screen_state) != 0) {
+                  if (id(screen_state) == 2) {
+                    if (id(screensaver_mode) == 1) {
+                      lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+                    } else if (id(screensaver_mode) == 2) {
+                      id(lvgl_comp)->show_page(id(screensaver_prev_page), LV_SCR_LOAD_ANIM_NONE, 0);
+                    }
+                  }
+                  id(main_display).set_brightness(id(screen_brightness_pct) * 255 / 100);
+                  id(lvgl_comp)->set_paused(false, false);
+                  id(screen_state) = 0;
+                }
+                // Update voltage label and show popup
+                snprintf(buf, sizeof(buf), "%.1f V", voltage);
+                lv_label_set_text(id(starter_alarm_voltage_label), buf);
+                lv_obj_clear_flag(id(starter_alarm_popup), LV_OBJ_FLAG_HIDDEN);
+                // Play alarm beep
+                id(rtttl_player)->stop();
+                id(rtttl_player)->play("beep:d=16,o=6,b=140:c,p,c,p,c");
+                ESP_LOGW("alarm", "Starter alarm fired: voltage=%.2fV trigger=%.1fV (setting=%d)", voltage, s_trigger, s_thresh);
+              } else if (voltage >= s_trigger && !id(starter_alarm_armed)) {
+                // Re-arm when voltage recovers
+                id(starter_alarm_armed) = true;
+                ESP_LOGI("alarm", "Starter alarm re-armed: voltage=%.2fV", voltage);
+              }
+            }
+          }
+          // Update popup voltage label while visible
+          if (id(starter_alarm_active)) {
+            float voltage = id(bm6_voltage_tpl).state;
+            if (!std::isnan(voltage)) {
+              snprintf(buf, sizeof(buf), "%.1f V", voltage);
+              lv_label_set_text(id(starter_alarm_voltage_label), buf);
+            }
+          }
+
 # 1. The "Hello World" Text
   - interval: 5s
     then:
@@ -5239,7 +5674,13 @@ interval:
           if (id(bat_alarm_active)) {
             uint32_t elapsed = now - id(bat_alarm_start_ms);
             if (elapsed < 120000) {
-              // Re-trigger beep every 5s for 2 minutes
+              id(rtttl_player)->stop();
+              id(rtttl_player)->play("beep:d=16,o=6,b=140:c,p,c,p,c");
+            }
+          }
+          if (id(starter_alarm_active)) {
+            uint32_t elapsed = now - id(starter_alarm_start_ms);
+            if (elapsed < 120000) {
               id(rtttl_player)->stop();
               id(rtttl_player)->play("beep:d=16,o=6,b=140:c,p,c,p,c");
             }
@@ -5249,10 +5690,13 @@ interval:
     then:
       - lambda: |-
           // Flash alarm popup red/black
-          if (id(bat_alarm_active)) {
-            static bool flash_on = false;
+          static bool flash_on = false;
+          if (id(bat_alarm_active) || id(starter_alarm_active)) {
             flash_on = !flash_on;
-            lv_obj_set_style_bg_color(id(bat_alarm_popup), flash_on ? lv_color_hex(0x660000) : lv_color_hex(0x000000), 0);
+            if (id(bat_alarm_active))
+              lv_obj_set_style_bg_color(id(bat_alarm_popup), flash_on ? lv_color_hex(0x660000) : lv_color_hex(0x000000), 0);
+            if (id(starter_alarm_active))
+              lv_obj_set_style_bg_color(id(starter_alarm_popup), flash_on ? lv_color_hex(0x660000) : lv_color_hex(0x000000), 0);
           }
 
           auto time = id(sntp_time).now();
