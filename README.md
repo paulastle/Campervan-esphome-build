@@ -4,13 +4,15 @@ An [ESPHome](https://esphome.io)-based ESP32-S3 dashboard for campervan monitori
 
 This is built for a specific campervan setup — it's shared as a reference for anyone building something similar. Fork it and adapt it to your own needs.
 
+It has been created with Claude code i dont profess to be a programmer!
+
 ## Hardware
 
 Two Waveshare display variants are supported, each with its own configuration file:
 
 | Display | Resolution | Config file |
 |---------|-----------|-------------|
-| [ESP32-S3-Touch-LCD-1.46B](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.46B) | 412x412 round IPS LCD | `waveshare-146.yaml` |
+| [ESP32-S3-Touch-LCD-1.46B](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.46B) | 412x412 round IPS LCD | `waveshare-146.yaml` (Previous project use the 1.75!) |
 | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466x466 AMOLED | `waveshare-175.yaml` |
 
 Both boards have an ESP32-S3 with 16 MB flash and 8 MB PSRAM, plus onboard IMU, RTC, and capacitive touch.
