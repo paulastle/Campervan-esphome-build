@@ -45,6 +45,31 @@ The dashboard reads data from these BLE peripherals:
 - [ESPHome](https://esphome.io/guides/installing_esphome) CLI (`pip install esphome` or `brew install esphome`)
 - Home Assistant (optional, for remote monitoring and control)
 
+## Victron BLE credentials
+
+Each Victron device needs its MAC address and encryption key in `secrets.yaml`. To find these:
+
+1. Open the **VictronConnect** app on your phone
+2. Connect to the Victron device
+3. Go to the device's **Settings** (gear icon)
+4. Under **Product info**, find the **MAC address**
+5. Enable **Instant readout** if not already enabled — this activates BLE advertising
+6. The **encryption key** is shown on the same screen once instant readout is enabled
+
+Enter the MAC as `AA:BB:CC:DD:EE:FF` and the key as a 32-character hex string in `secrets.yaml`.
+
+See the [victron_ble documentation](https://github.com/Fabian-Schmidt/esphome-victron_ble) for more details.
+
+## BM6 and ThermoPro MAC addresses
+
+The BM6 battery monitor and ThermoPro thermometers don't have a dedicated app for finding credentials — you'll need a BLE scanner such as [nRF Connect](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-mobile) (available for iOS and Android).
+
+1. Open nRF Connect and start scanning
+2. Look for devices named `BM6`, `TP357` or `TP351` (ThermoPro devices may also appear as `TP3xx`)
+3. The MAC address is shown next to each device name — copy it into `secrets.yaml`
+
+No encryption keys are needed for ThermoPro devices. The BM6 uses a fixed AES key that is already included in the firmware.
+
 ## Getting started
 
 1. Clone this repo:
