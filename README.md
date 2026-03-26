@@ -1,5 +1,17 @@
 # Campervan32
 
+## Changelog
+
+### v1.12 (2026-03-26)
+- Updated the power flow screen to show the van in the centre and animated icons
+- Added the ability to set the screen off times in settings
+- Added a toggle for temp display in C or F
+- Added the ability to change time zones and manually set the time if the NTP has not worked
+- Various other bug fixes and screen layout changes
+- The side button (boot) now performs a wake up on single click, return to the flow page on double click and screen off on long press
+
+---
+
 An [ESPHome](https://esphome.io)-based ESP32-S3 dashboard for campervan monitoring, running on small round Waveshare displays. Integrates with [Home Assistant](https://www.home-assistant.io/) for remote monitoring.
 
 This is built for a specific campervan setup — it's shared as a reference for anyone building something similar. Fork it and adapt it to your own needs.
@@ -12,7 +24,7 @@ Two Waveshare display variants are supported, each with its own configuration fi
 
 | Display | Resolution | Config file |
 |---------|-----------|-------------|
-| [ESP32-S3-Touch-LCD-1.46B](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.46B) | 412x412 round IPS LCD | `waveshare-146.yaml` (Previous project use the 1.75!) |
+| [ESP32-S3-Touch-LCD-1.46B](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.46B) | 412x412 round IPS LCD | `waveshare-146-OLD.yaml` (Previous project, use the 1.75!) |
 | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466x466 AMOLED | `waveshare-175.yaml` |
 
 Both boards have an ESP32-S3 with 16 MB flash and 8 MB PSRAM, plus onboard IMU, RTC, and capacitive touch.
@@ -106,7 +118,7 @@ No encryption keys are needed for ThermoPro devices. The BM6 uses a fixed AES ke
 ## Project structure
 
 ```
-waveshare-146.yaml        Main config — 1.46" round LCD variant
+waveshare-146-OLD.yaml    Previous config — 1.46" round LCD variant (no longer maintained)
 waveshare-175.yaml        Main config — 1.75" AMOLED variant
 secrets.yaml.example      Credential template (copy to secrets.yaml)
 components/               Custom ESPHome components
