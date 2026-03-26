@@ -104,6 +104,31 @@ esphome:
               case 2: ts->set_mirror_x(false); ts->set_mirror_y(false); ts->set_swap_xy(false); break;
               case 3: ts->set_mirror_x(true); ts->set_mirror_y(false); ts->set_swap_xy(true); break;
             }
+            // Apply stored timezone
+            int tz_off = id(utc_offset) + id(summer_time);
+            char tz_buf[32];
+            snprintf(tz_buf, sizeof(tz_buf), "UTC%d", -tz_off);
+            setenv("TZ", tz_buf, 1);
+            tzset();
+            // Sync new settings labels
+            lv_label_set_text(id(temp_unit_label), id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
+            {
+              int h = id(night_start_hour);
+              char nbuf[8];
+              snprintf(nbuf, sizeof(nbuf), "%d %s", h > 12 ? h - 12 : (h == 0 ? 12 : h), h >= 12 ? "pm" : "am");
+              lv_label_set_text(id(night_start_label), nbuf);
+              h = id(night_end_hour);
+              snprintf(nbuf, sizeof(nbuf), "%d %s", h > 12 ? h - 12 : (h == 0 ? 12 : h), h >= 12 ? "pm" : "am");
+              lv_label_set_text(id(night_end_label), nbuf);
+            }
+            {
+              int off = id(utc_offset);
+              char obuf[12];
+              if (off == 0) snprintf(obuf, sizeof(obuf), "UTC");
+              else snprintf(obuf, sizeof(obuf), "UTC%+d", off);
+              lv_label_set_text(id(utc_offset_label), obuf);
+            }
+            lv_label_set_text(id(summer_time_label), id(summer_time) ? "On" : "Off");
             // Boot to Flow page instead of Splash
             id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_NONE, 0);
 
@@ -220,6 +245,14 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
+  - id: flow_anims_running
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: flow_bat_direction
+    type: int
+    restore_value: no
+    initial_value: '0'
   - id: bm6_last_read_ms
     type: uint32_t
     restore_value: no
@@ -243,6 +276,38 @@ globals:
   - id: screen_rotation
     type: int
     restore_value: yes
+    initial_value: '0'
+  - id: night_start_hour
+    type: int
+    restore_value: yes
+    initial_value: '21'
+  - id: night_end_hour
+    type: int
+    restore_value: yes
+    initial_value: '7'
+  - id: temp_fahrenheit
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: utc_offset
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: summer_time
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: auto_set_time
+    type: int
+    restore_value: yes
+    initial_value: '1'
+  - id: last_ntp_sync
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: last_force_off_ms
+    type: uint32_t
+    restore_value: no
     initial_value: '0'
 
 i2c:
@@ -408,6 +473,7 @@ time:
   - platform: sntp
     id: sntp_time
     on_time_sync:
+      - lambda: "id(last_ntp_sync) = millis();"
       - pcf85063.write_time:
           id: pcf85063_time
   - platform: pcf85063
@@ -499,6 +565,9 @@ font:
       - "\U000F004D"  # mdi-arrow-left
       - "\U000F07D0"  # mdi-home-assistant
       - "\U000F07D1"  # mdi-home-automation (wifi status)
+      - "\U000F0140"  # mdi-chevron-down
+      - "\U000F0141"  # mdi-chevron-left
+      - "\U000F0142"  # mdi-chevron-right
   - file:
       type: web
       url: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
@@ -2140,19 +2209,22 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 66);
+            lv_obj_set_width(id(dots_container), 116);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
         - lambda: |-
@@ -2404,6 +2476,10 @@ lvgl:
             lv_obj_add_flag(id(flow_no_devices_label), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(flow_wifi_icon), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(flow_ha_icon), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(flow_arrow_solar), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(flow_arrow_battery), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(flow_arrow_mains), LV_OBJ_FLAG_HIDDEN);
+            id(flow_anims_running) = false;
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -2526,6 +2602,33 @@ lvgl:
             bg_opa: 100%
             border_width: 0
             radius: 2
+        # --- Flow arrow: Solar → Van (animated, moves downward) ---
+        - label:
+            id: flow_arrow_solar
+            align: CENTER
+            x: 0
+            y: -40
+            text: "\U000F0140"
+            text_font: mdi32
+            text_color: 0xFFCC00
+        # --- Flow arrow: Van → Battery (animated, moves left/right) ---
+        - label:
+            id: flow_arrow_battery
+            align: CENTER
+            x: -75
+            y: 8
+            text: "\U000F0141"
+            text_font: mdi32
+            text_color: 0x00CC66
+        # --- Flow arrow: Mains → Van (animated, moves left) ---
+        - label:
+            id: flow_arrow_mains
+            align: CENTER
+            x: 75
+            y: 8
+            text: "\U000F0141"
+            text_font: mdi32
+            text_color: 0x00CCCC
         # --- Mains icon (right) ---
         - label:
             id: flow_mains_icon
@@ -2801,15 +2904,15 @@ lvgl:
                   lv_label_set_text(id(minmax_icon_label), "\U000F07FA");
                   lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0x00FF88), 0);
                   if (std::isnan(mn)) {
-                    lv_label_set_text(id(minmax_min_label), "Min  -- \u00B0C");
+                    { char tbuf[32]; snprintf(tbuf, sizeof(tbuf), "Min  -- %s", id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C"); lv_label_set_text(id(minmax_min_label), tbuf); }
                   } else {
-                    snprintf(buf, sizeof(buf), "Min  %.1f \u00B0C", mn);
+                    snprintf(buf, sizeof(buf), "Min  %.1f %s", id(temp_fahrenheit) ? (mn * 9.0f / 5.0f + 32.0f) : mn, id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
                     lv_label_set_text(id(minmax_min_label), buf);
                   }
                   if (std::isnan(mx)) {
-                    lv_label_set_text(id(minmax_max_label), "Max  -- \u00B0C");
+                    { char tbuf[32]; snprintf(tbuf, sizeof(tbuf), "Max  -- %s", id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C"); lv_label_set_text(id(minmax_max_label), tbuf); }
                   } else {
-                    snprintf(buf, sizeof(buf), "Max  %.1f \u00B0C", mx);
+                    snprintf(buf, sizeof(buf), "Max  %.1f %s", id(temp_fahrenheit) ? (mx * 9.0f / 5.0f + 32.0f) : mx, id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
                     lv_label_set_text(id(minmax_max_label), buf);
                   }
                   lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
@@ -2911,15 +3014,15 @@ lvgl:
                   lv_label_set_text(id(minmax_icon_label), "\U000F0531");
                   lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0x44BB44), 0);
                   if (std::isnan(mn)) {
-                    lv_label_set_text(id(minmax_min_label), "Min  -- \u00B0C");
+                    { char tbuf[32]; snprintf(tbuf, sizeof(tbuf), "Min  -- %s", id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C"); lv_label_set_text(id(minmax_min_label), tbuf); }
                   } else {
-                    snprintf(buf, sizeof(buf), "Min  %.1f \u00B0C", mn);
+                    snprintf(buf, sizeof(buf), "Min  %.1f %s", id(temp_fahrenheit) ? (mn * 9.0f / 5.0f + 32.0f) : mn, id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
                     lv_label_set_text(id(minmax_min_label), buf);
                   }
                   if (std::isnan(mx)) {
-                    lv_label_set_text(id(minmax_max_label), "Max  -- \u00B0C");
+                    { char tbuf[32]; snprintf(tbuf, sizeof(tbuf), "Max  -- %s", id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C"); lv_label_set_text(id(minmax_max_label), tbuf); }
                   } else {
-                    snprintf(buf, sizeof(buf), "Max  %.1f \u00B0C", mx);
+                    snprintf(buf, sizeof(buf), "Max  %.1f %s", id(temp_fahrenheit) ? (mx * 9.0f / 5.0f + 32.0f) : mx, id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
                     lv_label_set_text(id(minmax_max_label), buf);
                   }
                   lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
@@ -3021,15 +3124,15 @@ lvgl:
                   lv_label_set_text(id(minmax_icon_label), "\U000F0290");
                   lv_obj_set_style_text_color(id(minmax_icon_label), lv_color_hex(0x44AADD), 0);
                   if (std::isnan(mn)) {
-                    lv_label_set_text(id(minmax_min_label), "Min  -- \u00B0C");
+                    { char tbuf[32]; snprintf(tbuf, sizeof(tbuf), "Min  -- %s", id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C"); lv_label_set_text(id(minmax_min_label), tbuf); }
                   } else {
-                    snprintf(buf, sizeof(buf), "Min  %.1f \u00B0C", mn);
+                    snprintf(buf, sizeof(buf), "Min  %.1f %s", id(temp_fahrenheit) ? (mn * 9.0f / 5.0f + 32.0f) : mn, id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
                     lv_label_set_text(id(minmax_min_label), buf);
                   }
                   if (std::isnan(mx)) {
-                    lv_label_set_text(id(minmax_max_label), "Max  -- \u00B0C");
+                    { char tbuf[32]; snprintf(tbuf, sizeof(tbuf), "Max  -- %s", id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C"); lv_label_set_text(id(minmax_max_label), tbuf); }
                   } else {
-                    snprintf(buf, sizeof(buf), "Max  %.1f \u00B0C", mx);
+                    snprintf(buf, sizeof(buf), "Max  %.1f %s", id(temp_fahrenheit) ? (mx * 9.0f / 5.0f + 32.0f) : mx, id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
                     lv_label_set_text(id(minmax_max_label), buf);
                   }
                   lv_obj_clear_flag(id(temp_minmax_popup), LV_OBJ_FLAG_HIDDEN);
@@ -4090,19 +4193,22 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 66);
+            lv_obj_set_width(id(dots_container), 116);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
         - lambda: |-
@@ -4111,7 +4217,7 @@ lvgl:
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(35, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+            id(lvgl_comp)->show_page(38, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
       on_swipe_up:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -4368,24 +4474,27 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 66);
+            lv_obj_set_width(id(dots_container), 116);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0xFFFFFF), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
       on_swipe_left:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
-            id(lvgl_comp)->show_page(33, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+            id(lvgl_comp)->show_page(38, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -4695,22 +4804,28 @@ lvgl:
       on_load:
         - lambda: |-
             lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_width(id(dots_container), 66);
+            lv_obj_set_width(id(dots_container), 116);
             lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
             lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
-            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
             id(settings_visible) = true;
+            lv_label_set_text(id(temp_unit_label), id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
       on_swipe_left:
-        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(39, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
       on_swipe_right:
         - lambda: |-
             lv_indev_wait_release(lv_indev_get_act());
@@ -4724,7 +4839,7 @@ lvgl:
       widgets:
         - label:
             align: CENTER
-            y: -140
+            y: -150
             text: "Display"
             text_font: roboto32
             text_color: 0xFFFFFF
@@ -4732,7 +4847,7 @@ lvgl:
         - obj:
             id: rotation_circle
             align: CENTER
-            y: -70
+            y: -80
             width: 80
             height: 80
             radius: 40
@@ -4753,7 +4868,7 @@ lvgl:
         - label:
             id: usb_pos_label
             align: CENTER
-            y: -20
+            y: -30
             text: "USB Left"
             text_font: roboto24
             text_color: 0x888888
@@ -4761,7 +4876,7 @@ lvgl:
         - button:
             align: CENTER
             x: -90
-            y: 30
+            y: 10
             width: 64
             height: 64
             radius: 32
@@ -4799,7 +4914,7 @@ lvgl:
         - label:
             id: rotation_value_label
             align: CENTER
-            y: 30
+            y: 10
             text: "0°"
             text_font: roboto24
             text_color: 0xFFFFFF
@@ -4807,7 +4922,7 @@ lvgl:
         - button:
             align: CENTER
             x: 90
-            y: 30
+            y: 10
             width: 64
             height: 64
             radius: 32
@@ -4841,11 +4956,67 @@ lvgl:
                   text: "\U000F0142"
                   text_font: mdi48
                   text_color: 0xFFFFFF
+        # Temperature unit row
+        - label:
+            align: CENTER
+            y: 75
+            text: "Temperature"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: 115
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(temp_fahrenheit) ? 0 : 1;
+                  id(temp_fahrenheit) = v;
+                  lv_label_set_text(id(temp_unit_label), v ? "\u00B0F" : "\u00B0C");
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: temp_unit_label
+            align: CENTER
+            y: 115
+            text: "\u00B0C"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: 115
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(temp_fahrenheit) ? 0 : 1;
+                  id(temp_fahrenheit) = v;
+                  lv_label_set_text(id(temp_unit_label), v ? "\u00B0F" : "\u00B0C");
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
         # Reboot button (shown when rotation changes)
         - button:
             id: rotation_reboot_btn
             align: CENTER
-            y: 105
+            y: 115
             width: 70
             height: 70
             radius: 35
@@ -4866,11 +5037,806 @@ lvgl:
         - label:
             id: rotation_reboot_label
             align: CENTER
-            y: 155
+            y: 165
             text: "Reboot"
             text_font: roboto24
             text_color: 0xFF8800
             hidden: true
+
+    # === Page 38: Night Hours Settings ===
+    - id: night_hours_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 116);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            id(settings_visible) = true;
+            {
+              int h = id(night_start_hour);
+              char nbuf[8];
+              snprintf(nbuf, sizeof(nbuf), "%d %s", h > 12 ? h - 12 : (h == 0 ? 12 : h), h >= 12 ? "pm" : "am");
+              lv_label_set_text(id(night_start_label), nbuf);
+              h = id(night_end_hour);
+              snprintf(nbuf, sizeof(nbuf), "%d %s", h > 12 ? h - 12 : (h == 0 ? 12 : h), h >= 12 ? "pm" : "am");
+              lv_label_set_text(id(night_end_label), nbuf);
+            }
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(33, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(35, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: CENTER
+            y: -140
+            text: "Night Mode"
+            text_font: roboto32
+            text_color: 0xFFFFFF
+        # Night Start Hour row
+        - label:
+            align: CENTER
+            y: -80
+            text: "Screen Off"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: -35
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {18, 19, 20, 21, 22, 23};
+                  const char* labels[] = {"6 pm", "7 pm", "8 pm", "9 pm", "10 pm", "11 pm"};
+                  int current = id(night_start_hour);
+                  int idx = 0;
+                  for (int i = 0; i < 6; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx - 1 + 6) % 6;
+                  id(night_start_hour) = vals[idx];
+                  lv_label_set_text(id(night_start_label), labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: night_start_label
+            align: CENTER
+            y: -35
+            text: "9 pm"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: -35
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {18, 19, 20, 21, 22, 23};
+                  const char* labels[] = {"6 pm", "7 pm", "8 pm", "9 pm", "10 pm", "11 pm"};
+                  int current = id(night_start_hour);
+                  int idx = 0;
+                  for (int i = 0; i < 6; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx + 1) % 6;
+                  id(night_start_hour) = vals[idx];
+                  lv_label_set_text(id(night_start_label), labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Night End Hour row
+        - label:
+            align: CENTER
+            y: 10
+            text: "Screen On"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: 55
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {5, 6, 7, 8, 9, 10};
+                  const char* labels[] = {"5 am", "6 am", "7 am", "8 am", "9 am", "10 am"};
+                  int current = id(night_end_hour);
+                  int idx = 0;
+                  for (int i = 0; i < 6; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx - 1 + 6) % 6;
+                  id(night_end_hour) = vals[idx];
+                  lv_label_set_text(id(night_end_label), labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: night_end_label
+            align: CENTER
+            y: 55
+            text: "7 am"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: 55
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int vals[] = {5, 6, 7, 8, 9, 10};
+                  const char* labels[] = {"5 am", "6 am", "7 am", "8 am", "9 am", "10 am"};
+                  int current = id(night_end_hour);
+                  int idx = 0;
+                  for (int i = 0; i < 6; i++) if (vals[i] == current) { idx = i; break; }
+                  idx = (idx + 1) % 6;
+                  id(night_end_hour) = vals[idx];
+                  lv_label_set_text(id(night_end_label), labels[idx]);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+
+    # === Page 39: Time Settings ===
+    - id: time_settings_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 116);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0x555555), 0);
+            id(settings_visible) = true;
+            {
+              int off = id(utc_offset);
+              char obuf[12];
+              if (off == 0) snprintf(obuf, sizeof(obuf), "UTC");
+              else snprintf(obuf, sizeof(obuf), "UTC%+d", off);
+              lv_label_set_text(id(utc_offset_label), obuf);
+            }
+            lv_label_set_text(id(summer_time_label), id(summer_time) ? "On" : "Off");
+            {
+              auto time = id(sntp_time).now();
+              if (time.is_valid()) {
+                char tbuf[8];
+                snprintf(tbuf, sizeof(tbuf), "%02d:%02d", time.hour, time.minute);
+                lv_label_set_text(id(current_time_label), tbuf);
+              }
+            }
+      on_swipe_left:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(40, LV_SCR_LOAD_ANIM_MOVE_LEFT, 200);
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(37, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: CENTER
+            y: -150
+            text: "Time"
+            text_font: roboto32
+            text_color: 0xFFFFFF
+        # Current time display
+        - label:
+            id: current_time_label
+            align: CENTER
+            y: -90
+            text: "--:--"
+            text_font: roboto32
+            text_color: 0xFFFFFF
+        # UTC Offset row
+        - label:
+            align: CENTER
+            y: -35
+            text: "UTC Offset"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: 10
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int off = id(utc_offset);
+                  off--;
+                  if (off < -12) off = 14;
+                  id(utc_offset) = off;
+                  char obuf[12];
+                  if (off == 0) snprintf(obuf, sizeof(obuf), "UTC");
+                  else snprintf(obuf, sizeof(obuf), "UTC%+d", off);
+                  lv_label_set_text(id(utc_offset_label), obuf);
+                  int tz_off = off + id(summer_time);
+                  char tz[32];
+                  snprintf(tz, sizeof(tz), "UTC%d", -tz_off);
+                  setenv("TZ", tz, 1);
+                  tzset();
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: utc_offset_label
+            align: CENTER
+            y: 10
+            text: "UTC"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: 10
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int off = id(utc_offset);
+                  off++;
+                  if (off > 14) off = -12;
+                  id(utc_offset) = off;
+                  char obuf[12];
+                  if (off == 0) snprintf(obuf, sizeof(obuf), "UTC");
+                  else snprintf(obuf, sizeof(obuf), "UTC%+d", off);
+                  lv_label_set_text(id(utc_offset_label), obuf);
+                  int tz_off = off + id(summer_time);
+                  char tz[32];
+                  snprintf(tz, sizeof(tz), "UTC%d", -tz_off);
+                  setenv("TZ", tz, 1);
+                  tzset();
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Summer Time row
+        - label:
+            align: CENTER
+            y: 60
+            text: "Summer Time"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: 105
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(summer_time) ? 0 : 1;
+                  id(summer_time) = v;
+                  lv_label_set_text(id(summer_time_label), v ? "On" : "Off");
+                  int tz_off = id(utc_offset) + v;
+                  char tz[32];
+                  snprintf(tz, sizeof(tz), "UTC%d", -tz_off);
+                  setenv("TZ", tz, 1);
+                  tzset();
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: summer_time_label
+            align: CENTER
+            y: 105
+            text: "Off"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: 105
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(summer_time) ? 0 : 1;
+                  id(summer_time) = v;
+                  lv_label_set_text(id(summer_time_label), v ? "On" : "Off");
+                  int tz_off = id(utc_offset) + v;
+                  char tz[32];
+                  snprintf(tz, sizeof(tz), "UTC%d", -tz_off);
+                  setenv("TZ", tz, 1);
+                  tzset();
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+
+    # === Page 40: Set Time ===
+    - id: set_time_page
+      bg_color: 0x000000
+      on_load:
+        - lambda: |-
+            lv_obj_clear_flag(id(dots_container), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_width(id(dots_container), 116);
+            lv_obj_clear_flag(id(dot0), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot1), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot2), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot3), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot4), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot5), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(dot6), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(dot7), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_bg_color(id(dot0), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot1), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot2), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot3), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot4), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot5), lv_color_hex(0x555555), 0);
+            lv_obj_set_style_bg_color(id(dot6), lv_color_hex(0xFFFFFF), 0);
+            id(settings_visible) = true;
+            lv_label_set_text(id(auto_time_label), id(auto_set_time) ? "On" : "Off");
+            if (id(auto_set_time)) {
+              // Auto mode: show sync info, hide manual controls
+              lv_obj_add_flag(id(manual_hour_title), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(manual_hour_left), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(manual_hour_label), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(manual_hour_right), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(manual_min_title), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(manual_min_left), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(manual_min_label), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(manual_min_right), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(sync_info_label), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(auto_time_display), LV_OBJ_FLAG_HIDDEN);
+              { auto t = id(sntp_time).now(); if (t.is_valid()) { char tb[8]; snprintf(tb, sizeof(tb), "%02d:%02d", t.hour, t.minute); lv_label_set_text(id(auto_time_display), tb); } }
+              uint32_t sync = id(last_ntp_sync);
+              char sbuf[32];
+              if (sync == 0) {
+                snprintf(sbuf, sizeof(sbuf), "No sync yet");
+              } else {
+                uint32_t ago = (millis() - sync) / 60000;
+                if (ago < 1) snprintf(sbuf, sizeof(sbuf), "Synced just now");
+                else if (ago < 60) snprintf(sbuf, sizeof(sbuf), "Synced %lum ago", (unsigned long)ago);
+                else snprintf(sbuf, sizeof(sbuf), "Synced %luh ago", (unsigned long)(ago / 60));
+              }
+              lv_label_set_text(id(sync_info_label), sbuf);
+            } else {
+              // Manual mode: show hour/min controls, hide sync info
+              lv_obj_clear_flag(id(manual_hour_title), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(manual_hour_left), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(manual_hour_label), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(manual_hour_right), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(manual_min_title), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(manual_min_left), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(manual_min_label), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(manual_min_right), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(sync_info_label), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(auto_time_display), LV_OBJ_FLAG_HIDDEN);
+              auto time = id(sntp_time).now();
+              if (time.is_valid()) {
+                char tbuf[8];
+                snprintf(tbuf, sizeof(tbuf), "%02d", time.hour);
+                lv_label_set_text(id(manual_hour_label), tbuf);
+                snprintf(tbuf, sizeof(tbuf), "%02d", time.minute);
+                lv_label_set_text(id(manual_min_label), tbuf);
+              }
+            }
+      on_swipe_left:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      on_swipe_right:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(39, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 200);
+      on_swipe_up:
+        - lambda: |-
+            lv_indev_wait_release(lv_indev_get_act());
+            id(lvgl_comp)->show_page(3, LV_SCR_LOAD_ANIM_MOVE_TOP, 200);
+      on_swipe_down:
+        - lambda: "lv_indev_wait_release(lv_indev_get_act());"
+      widgets:
+        - label:
+            align: CENTER
+            y: -150
+            text: "Set Time"
+            text_font: roboto32
+            text_color: 0xFFFFFF
+        # Auto Set Time toggle
+        - label:
+            align: CENTER
+            y: -90
+            text: "Auto (NTP)"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+        - button:
+            align: CENTER
+            x: -90
+            y: -45
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(auto_set_time) ? 0 : 1;
+                  id(auto_set_time) = v;
+                  lv_label_set_text(id(auto_time_label), v ? "On" : "Off");
+                  if (v) {
+                    lv_obj_add_flag(id(manual_hour_title), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_hour_left), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_hour_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_hour_right), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_min_title), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_min_left), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_min_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_min_right), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(sync_info_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(auto_time_display), LV_OBJ_FLAG_HIDDEN);
+                    { auto t = id(sntp_time).now(); if (t.is_valid()) { char tb[8]; snprintf(tb, sizeof(tb), "%02d:%02d", t.hour, t.minute); lv_label_set_text(id(auto_time_display), tb); } }
+                    uint32_t sync = id(last_ntp_sync);
+                    char sbuf[32];
+                    if (sync == 0) snprintf(sbuf, sizeof(sbuf), "No sync yet");
+                    else {
+                      uint32_t ago = (millis() - sync) / 60000;
+                      if (ago < 1) snprintf(sbuf, sizeof(sbuf), "Synced just now");
+                      else if (ago < 60) snprintf(sbuf, sizeof(sbuf), "Synced %lum ago", (unsigned long)ago);
+                      else snprintf(sbuf, sizeof(sbuf), "Synced %luh ago", (unsigned long)(ago / 60));
+                    }
+                    lv_label_set_text(id(sync_info_label), sbuf);
+                  } else {
+                    lv_obj_clear_flag(id(manual_hour_title), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_hour_left), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_hour_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_hour_right), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_min_title), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_min_left), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_min_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_min_right), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(sync_info_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(auto_time_display), LV_OBJ_FLAG_HIDDEN);
+                    auto time = id(sntp_time).now();
+                    if (time.is_valid()) {
+                      char tbuf[8];
+                      snprintf(tbuf, sizeof(tbuf), "%02d", time.hour);
+                      lv_label_set_text(id(manual_hour_label), tbuf);
+                      snprintf(tbuf, sizeof(tbuf), "%02d", time.minute);
+                      lv_label_set_text(id(manual_min_label), tbuf);
+                    }
+                  }
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: auto_time_label
+            align: CENTER
+            y: -45
+            text: "On"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+        - button:
+            align: CENTER
+            x: 90
+            y: -45
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            on_click:
+              - lambda: |-
+                  int v = id(auto_set_time) ? 0 : 1;
+                  id(auto_set_time) = v;
+                  lv_label_set_text(id(auto_time_label), v ? "On" : "Off");
+                  if (v) {
+                    lv_obj_add_flag(id(manual_hour_title), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_hour_left), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_hour_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_hour_right), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_min_title), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_min_left), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_min_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(manual_min_right), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(sync_info_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(auto_time_display), LV_OBJ_FLAG_HIDDEN);
+                    { auto t = id(sntp_time).now(); if (t.is_valid()) { char tb[8]; snprintf(tb, sizeof(tb), "%02d:%02d", t.hour, t.minute); lv_label_set_text(id(auto_time_display), tb); } }
+                    uint32_t sync = id(last_ntp_sync);
+                    char sbuf[32];
+                    if (sync == 0) snprintf(sbuf, sizeof(sbuf), "No sync yet");
+                    else {
+                      uint32_t ago = (millis() - sync) / 60000;
+                      if (ago < 1) snprintf(sbuf, sizeof(sbuf), "Synced just now");
+                      else if (ago < 60) snprintf(sbuf, sizeof(sbuf), "Synced %lum ago", (unsigned long)ago);
+                      else snprintf(sbuf, sizeof(sbuf), "Synced %luh ago", (unsigned long)(ago / 60));
+                    }
+                    lv_label_set_text(id(sync_info_label), sbuf);
+                  } else {
+                    lv_obj_clear_flag(id(manual_hour_title), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_hour_left), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_hour_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_hour_right), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_min_title), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_min_left), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_min_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(id(manual_min_right), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(sync_info_label), LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(id(auto_time_display), LV_OBJ_FLAG_HIDDEN);
+                    auto time = id(sntp_time).now();
+                    if (time.is_valid()) {
+                      char tbuf[8];
+                      snprintf(tbuf, sizeof(tbuf), "%02d", time.hour);
+                      lv_label_set_text(id(manual_hour_label), tbuf);
+                      snprintf(tbuf, sizeof(tbuf), "%02d", time.minute);
+                      lv_label_set_text(id(manual_min_label), tbuf);
+                    }
+                  }
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Sync info + current time (shown when Auto=On)
+        - label:
+            id: sync_info_label
+            align: CENTER
+            y: 20
+            text: "No sync yet"
+            text_font: roboto24
+            text_color: 0x888888
+        - label:
+            id: auto_time_display
+            align: CENTER
+            y: 65
+            text: "--:--"
+            text_font: roboto32
+            text_color: 0xFFFFFF
+        # Manual Hours row (shown when Auto=Off)
+        - label:
+            id: manual_hour_title
+            align: CENTER
+            y: 15
+            text: "Hours"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+            hidden: true
+        - button:
+            id: manual_hour_left
+            align: CENTER
+            x: -90
+            y: 55
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            hidden: true
+            on_click:
+              - lambda: |-
+                  struct timeval tv;
+                  gettimeofday(&tv, NULL);
+                  tv.tv_sec -= 3600;
+                  settimeofday(&tv, NULL);
+                  auto time = id(sntp_time).now();
+                  char tbuf[8];
+                  snprintf(tbuf, sizeof(tbuf), "%02d", time.hour);
+                  lv_label_set_text(id(manual_hour_label), tbuf);
+                  snprintf(tbuf, sizeof(tbuf), "%02d", time.minute);
+                  lv_label_set_text(id(manual_min_label), tbuf);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: manual_hour_label
+            align: CENTER
+            y: 55
+            text: "--"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+            hidden: true
+        - button:
+            id: manual_hour_right
+            align: CENTER
+            x: 90
+            y: 55
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            hidden: true
+            on_click:
+              - lambda: |-
+                  struct timeval tv;
+                  gettimeofday(&tv, NULL);
+                  tv.tv_sec += 3600;
+                  settimeofday(&tv, NULL);
+                  auto time = id(sntp_time).now();
+                  char tbuf[8];
+                  snprintf(tbuf, sizeof(tbuf), "%02d", time.hour);
+                  lv_label_set_text(id(manual_hour_label), tbuf);
+                  snprintf(tbuf, sizeof(tbuf), "%02d", time.minute);
+                  lv_label_set_text(id(manual_min_label), tbuf);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        # Manual Minutes row (shown when Auto=Off)
+        - label:
+            id: manual_min_title
+            align: CENTER
+            y: 90
+            text: "Minutes"
+            text_font: roboto24
+            text_color: 0xCCCCCC
+            hidden: true
+        - button:
+            id: manual_min_left
+            align: CENTER
+            x: -90
+            y: 130
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            hidden: true
+            on_click:
+              - lambda: |-
+                  struct timeval tv;
+                  gettimeofday(&tv, NULL);
+                  tv.tv_sec -= 60;
+                  settimeofday(&tv, NULL);
+                  auto time = id(sntp_time).now();
+                  char tbuf[8];
+                  snprintf(tbuf, sizeof(tbuf), "%02d", time.hour);
+                  lv_label_set_text(id(manual_hour_label), tbuf);
+                  snprintf(tbuf, sizeof(tbuf), "%02d", time.minute);
+                  lv_label_set_text(id(manual_min_label), tbuf);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0141"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
+        - label:
+            id: manual_min_label
+            align: CENTER
+            y: 130
+            text: "--"
+            text_font: roboto24
+            text_color: 0xFFFFFF
+            hidden: true
+        - button:
+            id: manual_min_right
+            align: CENTER
+            x: 90
+            y: 130
+            width: 64
+            height: 64
+            radius: 32
+            bg_color: 0x333333
+            border_width: 0
+            pad_all: 0
+            hidden: true
+            on_click:
+              - lambda: |-
+                  struct timeval tv;
+                  gettimeofday(&tv, NULL);
+                  tv.tv_sec += 60;
+                  settimeofday(&tv, NULL);
+                  auto time = id(sntp_time).now();
+                  char tbuf[8];
+                  snprintf(tbuf, sizeof(tbuf), "%02d", time.hour);
+                  lv_label_set_text(id(manual_hour_label), tbuf);
+                  snprintf(tbuf, sizeof(tbuf), "%02d", time.minute);
+                  lv_label_set_text(id(manual_min_label), tbuf);
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0142"
+                  text_font: mdi48
+                  text_color: 0xFFFFFF
 
 interval:
   - interval: 50ms
@@ -4895,11 +5861,11 @@ interval:
               if (tap_ms > 0 && (now_ms - tap_ms) > 100 && (now_ms - tap_ms) < 500) {
                 // DOUBLE-TAP → OFF
                 ESP_LOGI("screen", "DOUBLE-TAP → OFF from state %d", state);
+                id(last_force_off_ms) = millis();
                 if (state == 2 && id(screensaver_mode) == 1) {
                   lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
                 }
                 id(main_display).set_brightness(0);
-                id(lvgl_comp)->set_paused(true, false);
                 id(screen_state) = 3;
                 tap_ms = 0;
               } else {
@@ -4924,32 +5890,47 @@ interval:
             prev_idle = idle;
           }
 
-          // GPIO11 wake (OFF state only) — CST9217 touch interrupt
+          // Touch wake (OFF state only) — detect touch via LVGL idle time
           if (state == 3) {
-            if (off_since == 0) off_since = now_ms;
-            // Ignore touch interrupts for first 10s after screen off
-            if (now_ms - off_since < 10000) return;
-            int gpio11 = gpio_get_level(GPIO_NUM_11);
-            if (gpio11 == 0) {
-              wake_count++;
-              if (wake_count >= 2) {
-                // GPIO11 LOW for 2 consecutive polls (100ms) — real touch
-                ESP_LOGW("screen", "WAKE: GPIO11 LOW x%d (off for %lums)", wake_count, (unsigned long)(now_ms - off_since));
-                id(main_display).set_brightness(id(screen_brightness_pct) * 255 / 100);
-                id(lvgl_comp)->set_paused(false, false);
-                id(screen_state) = 0;
-                off_since = 0;
-                wake_count = 0;
-              }
-            } else {
-              wake_count = 0;
+            if (off_since == 0) {
+              off_since = now_ms;
+              lv_disp_trig_activity(NULL);  // Reset idle baseline
+            }
+            // Ignore touches for first 2s after screen off
+            if (now_ms - off_since < 2000) return;
+            uint32_t idle = lv_disp_get_inactive_time(NULL);
+            if (idle < 500) {
+              // Touch detected while screen off
+              ESP_LOGW("screen", "WAKE: touch detected (idle=%ums, off for %lums)", idle, (unsigned long)(now_ms - off_since));
+              id(main_display).set_brightness(id(screen_brightness_pct) * 255 / 100);
+              id(screen_state) = 0;
+              id(last_force_off_ms) = 0;
+              off_since = 0;
+              lv_disp_trig_activity(NULL);
             }
           }
   - interval: 500ms
     then:
       - lambda: |-
           int state = id(screen_state);
-          if (state >= 3) return;  // OFF: handled by 50ms GPIO poll
+          // OFF: check if night mode should wake screen in the morning
+          // Skip if screen was manually forced off (long press or double tap)
+          if (state >= 3) {
+            if (id(auto_night_mode) && id(last_force_off_ms) == 0) {
+              auto time = id(sntp_time).now();
+              if (time.is_valid()) {
+                int start = id(night_start_hour);
+                int end = id(night_end_hour);
+                bool night = (start > end) ? (time.hour >= start || time.hour < end) : (time.hour >= start && time.hour < end);
+                if (!night) {
+                  ESP_LOGI("screen", "MORNING WAKE: night mode ended, waking screen");
+                  id(main_display).set_brightness(id(screen_brightness_pct) * 255 / 100);
+                  id(screen_state) = 0;
+                }
+              }
+            }
+            return;
+          }
 
           if (id(settings_visible) || id(bat_alarm_active) || id(starter_alarm_active)) return;
 
@@ -4957,8 +5938,21 @@ interval:
           int dim_s = id(dim_timeout_sec);
           int off_s = id(off_timeout_sec);
 
-          // SCREENSAVER active: nothing else to do
+          // SCREENSAVER active: check if night mode should turn it off
           if (state == 2) {
+            if (id(auto_night_mode) && id(screensaver_mode) != 0) {
+              auto time = id(sntp_time).now();
+              if (time.is_valid() && (id(night_start_hour) > id(night_end_hour) ? (time.hour >= id(night_start_hour) || time.hour < id(night_end_hour)) : (time.hour >= id(night_start_hour) && time.hour < id(night_end_hour)))) {
+                ESP_LOGI("screen", "NIGHT MODE: turning off screensaver");
+                if (id(screensaver_mode) == 1) {
+                  lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+                } else if (id(screensaver_mode) == 2) {
+                  id(lvgl_comp)->show_page(id(screensaver_prev_page), LV_SCR_LOAD_ANIM_NONE, 0);
+                }
+                id(main_display).set_brightness(0);
+                id(screen_state) = 3;
+              }
+            }
             return;
           }
 
@@ -4967,7 +5961,7 @@ interval:
             int mode = id(screensaver_mode);
             if (id(auto_night_mode) && mode != 0) {
               auto time = id(sntp_time).now();
-              if (time.is_valid() && (time.hour >= 21 || time.hour < 7)) {
+              if (time.is_valid() && (id(night_start_hour) > id(night_end_hour) ? (time.hour >= id(night_start_hour) || time.hour < id(night_end_hour)) : (time.hour >= id(night_start_hour) && time.hour < id(night_end_hour)))) {
                 mode = 0;  // Force screensaver off at night
               }
             }
@@ -4975,7 +5969,6 @@ interval:
               // Off: skip screensaver, go straight to OFF
               ESP_LOGI("screen", "IDLE → OFF (screensaver disabled)");
               id(main_display).set_brightness(0);
-              id(lvgl_comp)->set_paused(true, false);
               id(screen_state) = 3;
             } else if (mode == 1) {
               // Clock: existing behavior
@@ -5001,6 +5994,16 @@ interval:
             ESP_LOGI("screen", "DIM: idle=%ums dim_timeout=%ds", idle_ms, dim_s);
             id(main_display).set_brightness(38);
             id(screen_state) = 1;
+            // Stop flow arrows when dimming
+            if (id(flow_anims_running)) {
+              lv_anim_del(id(flow_arrow_solar), (lv_anim_exec_xcb_t)lv_obj_set_y);
+              lv_anim_del(id(flow_arrow_battery), (lv_anim_exec_xcb_t)lv_obj_set_x);
+              lv_anim_del(id(flow_arrow_mains), (lv_anim_exec_xcb_t)lv_obj_set_x);
+              lv_obj_add_flag(id(flow_arrow_solar), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(flow_arrow_battery), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(flow_arrow_mains), LV_OBJ_FLAG_HIDDEN);
+              id(flow_anims_running) = false;
+            }
           }
 
           // DIM → ON (touch while dimmed)
@@ -5145,6 +6148,112 @@ interval:
             lv_obj_set_style_bg_color(id(flow_line_mains), idle, 0);
           }
 
+          // --- Animated flow arrows ---
+          bool solar_flowing = !std::isnan(mppt_i) && mppt_i > 0.1f;
+          bool bat_flowing = !std::isnan(shunt_i) && (shunt_i > 0.1f || shunt_i < -0.1f);
+          bool mains_flowing = !std::isnan(mains_i) && mains_i > 0.1f;
+          bool screen_on = (id(screen_state) == 0);
+          bool any_arrow = (solar_flowing || bat_flowing || mains_flowing) && screen_on;
+
+          // Determine battery direction: 1=charging (left), -1=discharging (right), 0=idle
+          int bat_dir = 0;
+          if (bat_flowing) bat_dir = (shunt_i > 0) ? 1 : -1;
+
+          if (any_arrow && !id(flow_anims_running)) {
+            // Start animations for active flows
+            if (solar_flowing) {
+              lv_obj_clear_flag(id(flow_arrow_solar), LV_OBJ_FLAG_HIDDEN);
+              lv_anim_t a;
+              lv_anim_init(&a);
+              lv_anim_set_var(&a, id(flow_arrow_solar));
+              lv_anim_set_values(&a, -58, -22);
+              lv_anim_set_time(&a, 1200);
+              lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+              lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+              lv_anim_start(&a);
+            }
+            if (bat_flowing) {
+              lv_obj_clear_flag(id(flow_arrow_battery), LV_OBJ_FLAG_HIDDEN);
+              lv_label_set_text(id(flow_arrow_battery), bat_dir > 0 ? "\U000F0141" : "\U000F0142");
+              lv_anim_t a;
+              lv_anim_init(&a);
+              lv_anim_set_var(&a, id(flow_arrow_battery));
+              if (bat_dir > 0) {
+                lv_anim_set_values(&a, -55, -95);  // Van → Battery (leftward)
+              } else {
+                lv_anim_set_values(&a, -95, -55);  // Battery → Van (rightward)
+              }
+              lv_anim_set_time(&a, 1200);
+              lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+              lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
+              lv_anim_start(&a);
+              id(flow_bat_direction) = bat_dir;
+            }
+            if (mains_flowing) {
+              lv_obj_clear_flag(id(flow_arrow_mains), LV_OBJ_FLAG_HIDDEN);
+              lv_anim_t a;
+              lv_anim_init(&a);
+              lv_anim_set_var(&a, id(flow_arrow_mains));
+              lv_anim_set_values(&a, 95, 55);  // Mains → Van (leftward)
+              lv_anim_set_time(&a, 1200);
+              lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+              lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
+              lv_anim_start(&a);
+            }
+            id(flow_anims_running) = true;
+          } else if (id(flow_anims_running)) {
+            // Check if we need to stop or update animations
+            if (!any_arrow) {
+              // Stop all animations
+              lv_anim_del(id(flow_arrow_solar), (lv_anim_exec_xcb_t)lv_obj_set_y);
+              lv_anim_del(id(flow_arrow_battery), (lv_anim_exec_xcb_t)lv_obj_set_x);
+              lv_anim_del(id(flow_arrow_mains), (lv_anim_exec_xcb_t)lv_obj_set_x);
+              lv_obj_add_flag(id(flow_arrow_solar), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(flow_arrow_battery), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(flow_arrow_mains), LV_OBJ_FLAG_HIDDEN);
+              id(flow_anims_running) = false;
+            } else {
+              // Update individual arrows: show/hide based on current flow state
+              if (solar_flowing) {
+                lv_obj_clear_flag(id(flow_arrow_solar), LV_OBJ_FLAG_HIDDEN);
+              } else {
+                lv_anim_del(id(flow_arrow_solar), (lv_anim_exec_xcb_t)lv_obj_set_y);
+                lv_obj_add_flag(id(flow_arrow_solar), LV_OBJ_FLAG_HIDDEN);
+              }
+              if (mains_flowing) {
+                lv_obj_clear_flag(id(flow_arrow_mains), LV_OBJ_FLAG_HIDDEN);
+              } else {
+                lv_anim_del(id(flow_arrow_mains), (lv_anim_exec_xcb_t)lv_obj_set_x);
+                lv_obj_add_flag(id(flow_arrow_mains), LV_OBJ_FLAG_HIDDEN);
+              }
+              // Handle battery direction change
+              if (bat_flowing) {
+                lv_obj_clear_flag(id(flow_arrow_battery), LV_OBJ_FLAG_HIDDEN);
+                if (bat_dir != id(flow_bat_direction)) {
+                  // Direction changed — restart animation
+                  lv_anim_del(id(flow_arrow_battery), (lv_anim_exec_xcb_t)lv_obj_set_x);
+                  lv_label_set_text(id(flow_arrow_battery), bat_dir > 0 ? "\U000F0141" : "\U000F0142");
+                  lv_anim_t a;
+                  lv_anim_init(&a);
+                  lv_anim_set_var(&a, id(flow_arrow_battery));
+                  if (bat_dir > 0) {
+                    lv_anim_set_values(&a, -55, -95);
+                  } else {
+                    lv_anim_set_values(&a, -95, -55);
+                  }
+                  lv_anim_set_time(&a, 1200);
+                  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+                  lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
+                  lv_anim_start(&a);
+                  id(flow_bat_direction) = bat_dir;
+                }
+              } else {
+                lv_anim_del(id(flow_arrow_battery), (lv_anim_exec_xcb_t)lv_obj_set_x);
+                lv_obj_add_flag(id(flow_arrow_battery), LV_OBJ_FLAG_HIDDEN);
+              }
+            }
+          }
+
           // --- Time-to-go / charge status display ---
           if (!std::isnan(ttg) && ttg > 0) {
             int mins = (int)ttg;
@@ -5227,11 +6336,17 @@ interval:
           float ft = id(fridge_temp).state;
           float fh = id(fridge_humidity).state;
 
+          // Temperature unit helpers
+          bool use_f = id(temp_fahrenheit);
+          auto to_disp = [use_f](float c) -> float { return use_f ? (c * 9.0f / 5.0f + 32.0f) : c; };
+          const char* tu = use_f ? "\u00B0F" : "\u00B0C";
+
           // Hub page labels
           if (std::isnan(vt)) {
-            lv_label_set_text(id(temp_van_val), "-- \u00B0C");
+            snprintf(buf, sizeof(buf), "-- %s", tu);
+            lv_label_set_text(id(temp_van_val), buf);
           } else {
-            snprintf(buf, sizeof(buf), "%.1f \u00B0C", vt);
+            snprintf(buf, sizeof(buf), "%.1f %s", to_disp(vt), tu);
             lv_label_set_text(id(temp_van_val), buf);
           }
           if (std::isnan(vh)) {
@@ -5242,9 +6357,10 @@ interval:
           }
 
           if (std::isnan(ot)) {
-            lv_label_set_text(id(temp_outside_val), "-- \u00B0C");
+            snprintf(buf, sizeof(buf), "-- %s", tu);
+            lv_label_set_text(id(temp_outside_val), buf);
           } else {
-            snprintf(buf, sizeof(buf), "%.1f \u00B0C", ot);
+            snprintf(buf, sizeof(buf), "%.1f %s", to_disp(ot), tu);
             lv_label_set_text(id(temp_outside_val), buf);
           }
           if (std::isnan(oh)) {
@@ -5255,9 +6371,10 @@ interval:
           }
 
           if (std::isnan(ft)) {
-            lv_label_set_text(id(temp_fridge_val), "-- \u00B0C");
+            snprintf(buf, sizeof(buf), "-- %s", tu);
+            lv_label_set_text(id(temp_fridge_val), buf);
           } else {
-            snprintf(buf, sizeof(buf), "%.1f \u00B0C", ft);
+            snprintf(buf, sizeof(buf), "%.1f %s", to_disp(ft), tu);
             lv_label_set_text(id(temp_fridge_val), buf);
           }
           if (std::isnan(fh)) {
@@ -5269,8 +6386,8 @@ interval:
 
           // Van sub-page arc + labels
           if (!std::isnan(vt)) {
-            lv_arc_set_value(id(van_temp_arc), (int)vt);
-            snprintf(buf, sizeof(buf), "%.1f \u00B0C", vt);
+            lv_arc_set_value(id(van_temp_arc), (int)to_disp(vt));
+            snprintf(buf, sizeof(buf), "%.1f %s", to_disp(vt), tu);
             lv_label_set_text(id(van_temp_label), buf);
           }
           if (!std::isnan(vh)) {
@@ -5280,8 +6397,8 @@ interval:
 
           // Outside sub-page arc + labels
           if (!std::isnan(ot)) {
-            lv_arc_set_value(id(outside_temp_arc), (int)ot);
-            snprintf(buf, sizeof(buf), "%.1f \u00B0C", ot);
+            lv_arc_set_value(id(outside_temp_arc), (int)to_disp(ot));
+            snprintf(buf, sizeof(buf), "%.1f %s", to_disp(ot), tu);
             lv_label_set_text(id(outside_temp_label), buf);
           }
           if (!std::isnan(oh)) {
@@ -5291,8 +6408,8 @@ interval:
 
           // Fridge sub-page arc + labels
           if (!std::isnan(ft)) {
-            lv_arc_set_value(id(fridge_temp_arc), (int)ft);
-            snprintf(buf, sizeof(buf), "%.1f \u00B0C", ft);
+            lv_arc_set_value(id(fridge_temp_arc), (int)to_disp(ft));
+            snprintf(buf, sizeof(buf), "%.1f %s", to_disp(ft), tu);
             lv_label_set_text(id(fridge_temp_label), buf);
           }
           if (!std::isnan(fh)) {
@@ -5428,7 +6545,7 @@ interval:
             lv_label_set_text(id(batt_detail_consumed_label), buf);
           }
           if (!std::isnan(shunt_temp)) {
-            snprintf(buf, sizeof(buf), "Temp: %.0f \u00B0C", shunt_temp);
+            snprintf(buf, sizeof(buf), "Temp: %.0f %s", id(temp_fahrenheit) ? (shunt_temp * 9.0f / 5.0f + 32.0f) : shunt_temp, id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
             lv_label_set_text(id(batt_detail_temp_label), buf);
           }
           if (!std::isnan(ttg) && ttg > 0) {
@@ -5591,7 +6708,7 @@ interval:
                   }
                 }
                 id(main_display).set_brightness(id(screen_brightness_pct) * 255 / 100);
-                id(lvgl_comp)->set_paused(false, false);
+
                 id(screen_state) = 0;
               }
               // Update SOC label and show popup
@@ -5635,7 +6752,7 @@ interval:
                     }
                   }
                   id(main_display).set_brightness(id(screen_brightness_pct) * 255 / 100);
-                  id(lvgl_comp)->set_paused(false, false);
+  
                   id(screen_state) = 0;
                 }
                 // Update voltage label and show popup
@@ -5723,9 +6840,13 @@ interval:
           if (!time.is_valid()) return;
           char buf[16];
 
+          // Update current time labels on Time settings pages
+          snprintf(buf, sizeof(buf), "%02d:%02d", time.hour, time.minute);
+          lv_label_set_text(id(current_time_label), buf);
+          lv_label_set_text(id(auto_time_display), buf);
+
           // Screensaver clock update
           if (id(screen_state) == 2 && id(screensaver_mode) == 1) {
-            snprintf(buf, sizeof(buf), "%02d:%02d", time.hour, time.minute);
             lv_label_set_text(id(ss_time_label), buf);
             const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
             char dbuf[20];
@@ -5869,6 +6990,8 @@ binary_sensor:
           - lambda: |-
               int state = id(screen_state);
               if (state == 0) return;  // Already on, nothing to do
+              // Don't wake if screen was just force-off'd by long press
+              if (state == 3 && millis() - id(last_force_off_ms) < 3000) return;
               ESP_LOGI("button", "BOOT single click → WAKE from state %d", state);
               if (state == 2) {
                 if (id(screensaver_mode) == 1) {
@@ -5878,8 +7001,8 @@ binary_sensor:
                 }
               }
               id(main_display).set_brightness(id(screen_brightness_pct) * 255 / 100);
-              id(lvgl_comp)->set_paused(false, false);
               id(screen_state) = 0;
+              id(last_force_off_ms) = 0;
               lv_disp_trig_activity(NULL);
       # Double click: go to Flow page
       - timing:
@@ -5897,18 +7020,38 @@ binary_sensor:
                 }
               }
               if (state >= 2) {
-                id(lvgl_comp)->set_paused(false, false);
+
               }
               id(main_display).set_brightness(id(screen_brightness_pct) * 255 / 100);
               id(lvgl_comp)->show_page(15, LV_SCR_LOAD_ANIM_NONE, 0);
               id(screen_state) = 0;
               lv_disp_trig_activity(NULL);
-      # Long press: reboot
+      # Long press: force screen off
       - timing:
           - ON for at least 2s
         then:
-          - logger.log: "BOOT long press → REBOOT"
-          - button.press: restart_button
+          - lambda: |-
+              ESP_LOGI("button", "BOOT long press → SCREEN OFF");
+              id(last_force_off_ms) = millis();
+              int state = id(screen_state);
+              if (state == 2) {
+                if (id(screensaver_mode) == 1) {
+                  lv_obj_add_flag(id(clock_screensaver), LV_OBJ_FLAG_HIDDEN);
+                } else if (id(screensaver_mode) == 2) {
+                  id(lvgl_comp)->show_page(id(screensaver_prev_page), LV_SCR_LOAD_ANIM_NONE, 0);
+                }
+              }
+              if (id(flow_anims_running)) {
+                lv_anim_del(id(flow_arrow_solar), (lv_anim_exec_xcb_t)lv_obj_set_y);
+                lv_anim_del(id(flow_arrow_battery), (lv_anim_exec_xcb_t)lv_obj_set_x);
+                lv_anim_del(id(flow_arrow_mains), (lv_anim_exec_xcb_t)lv_obj_set_x);
+                lv_obj_add_flag(id(flow_arrow_solar), LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(id(flow_arrow_battery), LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(id(flow_arrow_mains), LV_OBJ_FLAG_HIDDEN);
+                id(flow_anims_running) = false;
+              }
+              id(main_display).set_brightness(0);
+              id(screen_state) = 3;
 
 button:
   - platform: restart
@@ -5993,7 +7136,7 @@ sensor:
       else if (soc >= 30) soc_color = lv_color_hex(0xFF8800);
       else soc_color = lv_color_hex(0xFF4444);
       lv_obj_set_style_text_color(id(bm6_soc_label), soc_color, 0);
-      snprintf(buf, sizeof(buf), "%.0f °C", temp);
+      snprintf(buf, sizeof(buf), "%.0f %s", id(temp_fahrenheit) ? (temp * 9.0f / 5.0f + 32.0f) : temp, id(temp_fahrenheit) ? "\u00B0F" : "\u00B0C");
       lv_label_set_text(id(bm6_temp_label), buf);
       lv_label_set_text(id(bm6_status_label), "OK");
       lv_obj_set_style_text_color(id(bm6_status_label), lv_color_hex(0x00CC66), 0);
