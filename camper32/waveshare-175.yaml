@@ -26,7 +26,7 @@ esphome:
       then:
         - delay: 300ms
         - lambda: |-
-            ESP_LOGW("campervan", "CampervanOS v11 booted");
+            ESP_LOGW("campervan", "CampervanOS v1.12 booted");
             van_temp_hist.init();
             outside_temp_hist.init();
             fridge_temp_hist.init();
@@ -1089,7 +1089,7 @@ lvgl:
         - label:
             align: CENTER
             y: 140
-            text: "v11"
+            text: "v1.12"
             text_font: roboto24
             text_color: 0x666666
 
